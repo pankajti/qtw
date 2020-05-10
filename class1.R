@@ -21,6 +21,12 @@ mat = cbind(matrix(tokens[c(2, 4, 6:8, 10)], nrow = nrow(tmp),
             tmp)
 dim(mat)
 
+
+locCounts = t(locCounts)
+plot(locCounts, type = "n", xlab = "", ylab = "")
+text(locCounts, labels = locCounts[,3], cex = .8, srt = 45)
+
+
 processLine = function(x)
 {
   tokens = strsplit(x, "[;=,]")[[1]]
@@ -124,6 +130,9 @@ class(locCounts)
 
  locCounts = t(locCounts)
  plot(locCounts, type = "n", xlab = "", ylab = "")
+ 
+ 
+ 
  text(locCounts, labels = locCounts[,3], cex = .8, srt = 45)
  findGlobals(readData, merge = FALSE)$variables
 

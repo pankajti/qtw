@@ -31,6 +31,50 @@ offline = readData(offline_file_path )
 
 
 ```{r}
+offline = offline[ , !(names(offline) %in% c("scanMac", "posZ"))]
+
+length(unique(offline$orientation))
+
+plot(ecdf(offline$orientation))
+
+ 
+
+ 
+with(offline, boxplot(orientation ~ angle,
+                      xlab = "nearest 45 degree angle",
+                      ylab="orientation"))
+
+ 
+ 
+
+
+
+```
+
+```{r}
+locDF = with(offline,
+             by(offline, list(posX, posY), function(x) x))
+ 
+locDF = locDF[ !sapply(locDF, is.null) ]
+locCounts = sapply(locDF, nrow)
+locCounts = sapply(locDF,
+                   function(df)
+                     c(df[1, c("posX", "posY")], count = nrow(df)))
+class(locCounts)
+ dim(locCounts)
+ locCounts[ , 1:8]
+ locCounts = t(locCounts)
+ plot(locCounts, type = "n", xlab = "", ylab = "")
+ text(locCounts, labels = locCounts[,3], cex = .8, srt = 45)
+
+
+```
+
+
+
+ 
+
+```{r}
 bwplot(signal ~ factor(angle) | mac, data = offline,
         subset = posX == 2 & posY == 12
         & mac != "00:0f:a3:39:dd:cd",
