@@ -79,7 +79,7 @@ for i in x:
         text = ax.text(j, i, c[str(x)+str(y)],
                        ha="center", va="center", color="w")
 
-ax.set_title("Harvest of local farmers (in tons/year)")
+ax.set_title("fff")
 fig.tight_layout()
 plt.show()
 
