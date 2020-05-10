@@ -1,5 +1,9 @@
 library(tidyverse)
 library(magrittr)
+library(fields)
+library(codetools)
+library(lattice)
+
 
 offline_file_path = "/Users/pankaj/dev/git/smu/qtw/data/offline.final.trace.txt"
 online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
@@ -72,7 +76,92 @@ surfaceSS = function(data, mac, angle){
   
 }
 
+reshapeSS = function(data, varSignal = "signal",
+                     keepVars = c("posXY", "posX","posY"), sampleAngle= FALSE) {
+  byLocation =
+    with(data, by(data, list(posXY),
+                  function(x) {
+                    if (sampleAngle) x = x[x$angle == sample(refs, size = 1), ]
+                    
+                    ans = x[1, keepVars]
+                    avgSS = tapply(x[ , varSignal ], x$mac, mean)
+                    y = matrix(avgSS, nrow = 1, ncol = 6,
+                               dimnames = list(ans$posXY,
+                                               names(avgSS)))
+                    cbind(ans, y)
+                  }))
+  newDataSS = do.call("rbind", byLocation)
+  
+  return(newDataSS)
+}
 
-recordsRedo = readData(file_path)
 
-identical(offline, recordsRedo)
+selectTrain = function(angleNewObs, offlineSummary, m){
+  
+  ## todo check below
+  nearestAngle = roundOrientation(angleNewObs)
+  
+  if (m %% 2 == 1) {
+    angles = seq(-45 * (m - 1) /2, 45 * (m - 1) /2, length = m)
+  } else {
+    m = m + 1
+    angles = seq(-45 * (m - 1) /2, 45 * (m - 1) /2, length = m)
+    if (sign(angleNewObs - nearestAngle) > -1)
+      angles = angles[ -1 ]
+    else
+      angles = angles[ -m ]
+  }
+  
+  
+  
+  angles = angles + nearestAngle
+  angles[angles < 0] = angles[ angles < 0 ] + 360
+  angles[angles > 360] = angles[ angles > 360 ] - 360
+  
+  
+  offlineSubset =
+    offlineSummary[ offlineSummary$angle %in% angles, ]
+  
+  trainSS = reshapeSS(offlineSubset, varSignal = "avgSignal")
+  trainSS
+  
+}
+
+findNN = function(newSignal, trainSubset) {
+  diffs = apply(trainSubset[ , 4:9], 1,
+                function(x) x - newSignal)
+  dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) )
+  closest = order(dists)
+  return(trainSubset[closest, 1:3 ])
+}
+
+predXY = function(newSignals, newAngles, trainData,
+                  numAngles = 1, k = 3){
+  closeXY = list(length = nrow(newSignals))
+  for (i in 1:nrow(newSignals)) {
+    trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
+    closeXY[[i]] =
+      findNN(newSignal = as.numeric(newSignals[i, ]), trainSS)
+  }
+  estXY = lapply(closeXY, function(x) sapply(x[ , 2:3],
+                                             function(x) mean(x[1:k])))
+  estXY = do.call("rbind", estXY)
+  return(estXY)
+}
+
+predXY = function(newSignals, newAngles, trainData,
+                  numAngles = 1, k = 3){
+  closeXY = list(length = nrow(newSignals))
+  for (i in 1:nrow(newSignals)) {
+    trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
+    closeXY[[i]] = findNN(newSignal = as.numeric(newSignals[i, ]),
+                          trainSS)
+  }
+  estXY = lapply(closeXY, function(x)
+    sapply(x[ , 2:3],
+           function(x) mean(x[1:k])))
+  estXY = do.call("rbind", estXY)
+  return(estXY)
+}
+
+ 
