@@ -149,19 +149,6 @@ predXY = function(newSignals, newAngles, trainData,
   return(estXY)
 }
 
-predXY = function(newSignals, newAngles, trainData,
-                  numAngles = 1, k = 3){
-  closeXY = list(length = nrow(newSignals))
-  for (i in 1:nrow(newSignals)) {
-    trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
-    closeXY[[i]] = findNN(newSignal = as.numeric(newSignals[i, ]),
-                          trainSS)
-  }
-  estXY = lapply(closeXY, function(x)
-    sapply(x[ , 2:3],
-           function(x) mean(x[1:k])))
-  estXY = do.call("rbind", estXY)
-  return(estXY)
-}
+ 
 
  

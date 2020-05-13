@@ -19,13 +19,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
+```{r , echo=FALSE}
 offline_file_path = "/Users/pankaj/dev/git/smu/qtw/data/offline.final.trace.txt"
   online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
 ```
 
 
-```{r pressure, echo=FALSE}
+```{r , echo=FALSE}
 offline = readData(offline_file_path )
 ```
 
@@ -130,6 +130,8 @@ offlineSummary = do.call("rbind", signalSummary)
 
 
 ```{r}
+subMacs = names(sort(table(offline$mac), decreasing = TRUE))[1:7]
+
  oneAPAngle = subset(offline, mac == subMacs[5] & angle == 0)
  
  oneAPAngle = subset(offlineSummary,
@@ -173,6 +175,7 @@ surfaceSS(data = offlineSummary, mac == subMacs[5] & angle == 0)
 
 
 ```{r}
+subMacs = names(sort(table(offline$mac), decreasing = TRUE))[1:7]
 
  offlineSummary = subset(offlineSummary, mac != subMacs[2])
  
@@ -196,6 +199,7 @@ surfaceSS(data = offlineSummary, mac == subMacs[5] & angle == 0)
 
 
 ```{r}
+  macs = unique(offlineSummary$mac)
 
  online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
   
