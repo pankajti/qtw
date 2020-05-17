@@ -78,7 +78,7 @@ surfaceSS = function(data, mac, angle){
 
 reshapeSS = function(data, varSignal = "signal",
                      keepVars = c("posXY", "posX","posY"), sampleAngle= FALSE) {
-  refs = seq(0, by = 45, length = 9)
+  refs = seq(0, by = 45, length = 8)
   
   byLocation =
     with(data, by(data, list(posXY),
@@ -167,6 +167,8 @@ predXY = function(newSignals, newAngles, trainData,
     closeXY[[i]] =
       findNN(newSignal = as.numeric(newSignals[i, ]), trainSS)
   }
+  
+  
   estXY = lapply(closeXY, function(x) sapply(x[ , 2:3],
                                              function(x) mean(x[1:k])))
   estXY = do.call("rbind", estXY)
@@ -177,4 +179,49 @@ calcError =
   function(estXY, actualXY)
     sum( rowSums( (estXY - actualXY)^2) )
 
+
+run_kkross_fold = function(offlineSummaryData  , v = 11,
+                             K = 20)
+{
+  permuteLocs = sample(unique(offlineSummaryData$posXY))
+  permuteLocs = matrix(permuteLocs, ncol = v,
+                       nrow = floor(length(permuteLocs)/v))
+  
+  keepVars = c("posXY", "posX","posY", "orientation", "angle")
+  onlineCVSummary = reshapeSS(offlineSummaryData, keepVars = keepVars,
+                              sampleAngle = TRUE)
+  
+  
+  err = rep(0, K)
+  for (j in 1:v) {
+    onlineFold = subset(onlineCVSummary,
+                        posXY %in% permuteLocs[ , j]) 
+    offlineFold = subset(offlineSummaryData,
+                         posXY %in% permuteLocs[ , -j])
+    actualFold = onlineFold[ , c("posX", "posY")]
+    for (k in 1:K) {
+      print(paste("running for  j ", j ," k ",  k))
+      estFold = predXY(newSignals = onlineFold[ , 6:11],
+                       newAngles = onlineFold[ , 4],
+                       offlineFold, numAngles = 3, k = k)
+      err[k] = err[k] + calcError(estFold, actualFold)
+    }
+  }
+  err
+}
+
+createOnlineSummary =  function(data ){
+  keepVars = c("posXY", "posX","posY", "orientation", "angle")
+  byLoc = with(online,
+               by(online, list(posXY),
+                  function(x) {
+                    ans = x[1, keepVars]
+                    avgSS = tapply(x$signal, x$mac, mean)
+                    y = matrix(avgSS, nrow = 1, ncol = 6,
+                               dimnames = list(ans$posXY, names(avgSS)))
+                    cbind(ans, y)
+                  }))
+  onlineSummary = do.call("rbind", byLoc)
+  onlineSummary
+}
  
