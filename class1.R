@@ -1,5 +1,5 @@
 
-txt = readLines("/Users/pankaj/dev/git/smu/qtw/data/offline.final.trace.txt")
+txt = readLines("/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt")
 
 length(txt)
 
@@ -227,8 +227,7 @@ class(locCounts)
 
   macs = unique(offlineSummary$mac)
   
-  offline_file_path = "/Users/pankaj/dev/git/smu/qtw/data/offline.final.trace.txt"
-  online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
+  online_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/online.final.trace.txt"
   
   
   online = readData(online_file_path, subMacs = macs)

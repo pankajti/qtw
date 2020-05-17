@@ -1,0 +1,92 @@
+---
+title: "QTW_CASE_STUDY_1"
+author: "Pankaj Kumar"
+date: "5/14/2020"
+output: html_document
+---
+
+```{r , include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction 
+
+The case study is about the precition of handheld device location based on its signal strength 
+
+The data is provided in followin format  : 
+
+![layeout](../class1/data/layout.png)
+
+There are 6 points where data is recorded from 166 different locations. on each location 
+
+
+##  Methods 
+
+
+##  EDA 
+
+
+##  Data preprocessing 
+
+##  Model 
+
+### Knn with euclidean distance
+
+#### with both macs included 
+
+#### with C0
+
+#### with CD 
+
+### Knn with inverse square signal strength (weighted distance formula) 
+
+#### with both macs included 
+
+#### with C0
+
+#### with CD 
+
+## Summary 
+
+
+## Appendix 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE,
+    comment=NA)
+```
+
+## Example
+
+```{r}
+source("case_study_functions.R", echo = T, prompt.echo = "", spaced = F)
+```
+
+
+
+## Introduction 
+
+### Case Study 
+
+
+### Case study Data fromat
+
+### Case Study offline Data preprocessing
+
+```{r , code = readLines("case_study_functions.R")}
+offline_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt"
+online_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/online.final.trace.txt"
+  offline = readData(offline_file_path )
+  subMacs = names(sort(table(offline$mac), decreasing = TRUE))[1:7]
+with(offline, boxplot(orientation ~ angle,
+                      xlab = "nearest 45 degree angle",
+                      ylab="orientation"))
+```
+
+## Methods 
+
+
+ 
+
+ 

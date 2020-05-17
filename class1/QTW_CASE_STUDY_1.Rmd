@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## R Markdown
 
 
-```{r code = readLines("case_study_functions.R")}
+```{r , code = readLines("case_study_functions.R")}
 ```
 
 ## Including Plots
@@ -20,8 +20,8 @@ knitr::opts_chunk$set(echo = TRUE)
 You can also embed plots, for example:
 
 ```{r , echo=FALSE}
-offline_file_path = "/Users/pankaj/dev/git/smu/qtw/data/offline.final.trace.txt"
-  online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
+offline_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt"
+  online_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/online.final.trace.txt"
 ```
 
 
@@ -117,6 +117,7 @@ offline$posXY = paste(offline$posX, offline$posY, sep = "-")
 ```{r}
 
 offlineSummary = do.call("rbind", signalSummary)
+
  
  breaks = seq(-90, -30, by = 5)
  bwplot(sdSignal ~ cut(avgSignal, breaks = breaks),
@@ -201,9 +202,6 @@ subMacs = names(sort(table(offline$mac), decreasing = TRUE))[1:7]
 ```{r}
   macs = unique(offlineSummary$mac)
 
- online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
-  
-  
   online = readData(online_file_path, subMacs = macs)
   
   online$posXY = paste(online$posX, online$posY, sep = "-")

@@ -5,8 +5,8 @@ library(codetools)
 library(lattice)
 
 
-offline_file_path = "/Users/pankaj/dev/git/smu/qtw/data/offline.final.trace.txt"
-online_file_path = "/Users/pankaj/dev/git/smu/qtw/data/online.final.trace.txt"
+offline_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt"
+online_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/online.final.trace.txt"
 
 
 roundOrientation = function(angles) {
@@ -78,6 +78,8 @@ surfaceSS = function(data, mac, angle){
 
 reshapeSS = function(data, varSignal = "signal",
                      keepVars = c("posXY", "posX","posY"), sampleAngle= FALSE) {
+  refs = seq(0, by = 45, length = 9)
+  
   byLocation =
     with(data, by(data, list(posXY),
                   function(x) {
@@ -95,6 +97,28 @@ reshapeSS = function(data, varSignal = "signal",
   return(newDataSS)
 }
 
+
+createSummary = function(data) {
+  data$posXY = paste(data$posX, data$posY, sep = "-")
+  
+  byLocAngleAP = with(data,
+                      by(data, list(posXY, angle, mac),
+                         function(x) x))
+  # Then we can calculate summary statistics on each of these data frames with
+  signalSummary =
+    lapply(byLocAngleAP,
+           function(oneLoc) {
+             ans = oneLoc[1, ]
+             ans$medSignal = median(oneLoc$signal)
+             ans$avgSignal = mean(oneLoc$signal)
+             ans$num = length(oneLoc$signal)
+             ans$sdSignal = sd(oneLoc$signal)
+             ans$iqrSignal = IQR(oneLoc$signal)
+             ans
+           })
+  dataSummary = do.call("rbind", signalSummary)
+  dataSummary
+}
 
 selectTrain = function(angleNewObs, offlineSummary, m){
   
@@ -149,6 +173,8 @@ predXY = function(newSignals, newAngles, trainData,
   return(estXY)
 }
 
- 
+calcError =
+  function(estXY, actualXY)
+    sum( rowSums( (estXY - actualXY)^2) )
 
  
