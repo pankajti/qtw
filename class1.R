@@ -279,11 +279,6 @@ class(locCounts)
   
   actualXY = onlineSummary[ , c("posX", "posY")]
   sapply(list(estXYk1, estXYk3), calcError, actualXY)
-  
-  
-  estXY1 = lapply(closeXY,
-                 function(x) sapply(x, function(x) mean(x[1:k])))
-  
   v = 11
   permuteLocs = sample(unique(offlineSummary$posXY))
   permuteLocs = matrix(permuteLocs, ncol = v,
@@ -303,6 +298,52 @@ class(locCounts)
   estFold = predXY(newSignals = onlineFold[ , 6:11],
                    newAngles = onlineFold[ , 4],
                    offlineFold, numAngles = 3, k = 3)
+  
+  newSignals = onlineFold[ , 6:11]
+  closeXY = list(length = nrow(newSignals))
+  newAngles = onlineFold[ , 4]
+  numAngles = 3
+  for (i in 1:nrow(newSignals)) {
+    trainSS = selectTrain(newAngles[i], offlineFold, m = numAngles)
+    closeXY[[i]] =
+      findNN(newSignal = as.numeric(newSignals[i, ]), trainSS)
+  }
+  
+  
+  #### dist
+  trainData = offlineSummary_without_cd
+  trainSS = selectTrain(newAngles[1], trainData, m = numAngles)
+  trainSubset = trainSS
+  
+  newSignal = as.numeric(newSignals[1, ])
+  diffs = apply(trainSubset[ , 4:9], 1,
+                function(x) x - newSignal)
+  dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) )
+  inv_dists = 1/dists
+  
+  closest = order(dists)
+ aa = trainSubset[closest, 1:3 ]
+ aa$inv_di = inv_dist
+  
+ 
+ diffs = apply(trainSubset[ , 4:9], 1,
+               function(x) x - newSignal)
+ dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) )
+ closest = order(dists)
+ sorted_dist = sort(dists)
+ inv_sorted_dist = 1/sorted_dist
+ weights = inv_sorted_dist/(sum(inv_sorted_dist[1:k]))
+ closest_weight = trainSubset[closest, 1:3 ]
+ closest_weight$weights = weights
+  
+  
+  estXY = lapply(closeXY, function(x) sapply(x[ , 2:3],
+                                             function(x) mean(x[1:k])))
+  estXY = do.call("rbind", estXY)
+  
+  
+  estXY1 = lapply(closeXY,
+                  function(x) sapply(x, function(x) mean(x[1:k])))
   
   actualFold = onlineFold[ , c("posX", "posY")]
   calcError(estFold, actualFold)

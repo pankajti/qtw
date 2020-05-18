@@ -75,6 +75,7 @@ surfaceSS = function(data, mac, angle){
   points(oneAPAngle$posX, oneAPAngle$posY, pch=19, cex = 0.5)
   
 }
+ 
 
 reshapeSS = function(data, varSignal = "signal",
                      keepVars = c("posXY", "posX","posY"), sampleAngle= FALSE) {
@@ -87,7 +88,8 @@ reshapeSS = function(data, varSignal = "signal",
                     
                     ans = x[1, keepVars]
                     avgSS = tapply(x[ , varSignal ], x$mac, mean)
-                    y = matrix(avgSS, nrow = 1, ncol = 6,
+                    avss= avgSS
+                    y = matrix(avgSS, nrow = 1, ncol = length(unique(data$mac)),
                                dimnames = list(ans$posXY,
                                                names(avgSS)))
                     cbind(ans, y)
@@ -156,8 +158,26 @@ findNN = function(newSignal, trainSubset) {
                 function(x) x - newSignal)
   dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) )
   closest = order(dists)
+  
   return(trainSubset[closest, 1:3 ])
 }
+
+findNNWeight = function(newSignal, trainSubset, k ) {
+  diffs = apply(trainSubset[ , 4:9], 1,
+                function(x) x - newSignal)
+  dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) )
+  closest = order(dists)
+  sorted_dist = sort(dists)
+  inv_sorted_dist = 1/sorted_dist
+  weights = inv_sorted_dist/(sum(inv_sorted_dist[1:k]))
+  closest_weight = trainSubset[closest, 1:3 ]
+  closest_weight$weights = weights
+  closest_weight$weighted_X = weights*closest_weight$posX
+  closest_weight$weighted_Y = weights*closest_weight$posY
+  
+  return(closest_weight)
+}
+
 
 predXY = function(newSignals, newAngles, trainData,
                   numAngles = 1, k = 3){
@@ -168,9 +188,24 @@ predXY = function(newSignals, newAngles, trainData,
       findNN(newSignal = as.numeric(newSignals[i, ]), trainSS)
   }
   
-  
   estXY = lapply(closeXY, function(x) sapply(x[ , 2:3],
                                              function(x) mean(x[1:k])))
+  estXY = do.call("rbind", estXY)
+  return(estXY)
+}
+
+
+predXYWeighted = function(newSignals, newAngles, trainData,
+                  numAngles = 1, k = 3){
+  closeXY = list(length = nrow(newSignals))
+  for (i in 1:nrow(newSignals)) {
+    trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
+    closeXY[[i]] =
+      findNNWeight(newSignal = as.numeric(newSignals[i, ]), trainSS, k)
+  }
+  
+  estXY = lapply(closeXY, function(x) sapply(x[ , 5:6],
+                                             function(x) mean(x[1:k] )))
   estXY = do.call("rbind", estXY)
   return(estXY)
 }
