@@ -12,73 +12,29 @@ offline$posXY = paste(offline$posX, offline$posY, sep = "-")
  
  offlineSummary_without_c0 = subset(offlineSummary, mac != subMacs[1])
  
+ macs = unique(offlineSummary$mac)
+ 
+ online = readData(online_file_path, subMacs = macs)
+ online$posXY = paste(online$posX, online$posY, sep = "-")
+ onlineSummary = createOnlineSummary(online)
+ 
   actualXY = onlineSummary[ , c("posX", "posY")]
   
-  caclulate_errors = function(offlineData ){
-    macs = unique(offlineData$mac)
-    print(macs)
-    online = readData(online_file_path, subMacs = macs)
-    online$posXY = paste(online$posX, online$posY, sep = "-")
-    onlineSummary= createOnlineSummary(online)
-    
-  estXYk3 = predXY(newSignals = onlineSummary[ , 6:11],
-                   newAngles = onlineSummary[ , 4],
-                   offlineData, numAngles = 3, k = 3)
   
-  estXYk1 = predXY(newSignals = onlineSummary[ , 6:11],
-                   newAngles = onlineSummary[ , 4],
-                   offlineData, numAngles = 3, k = 1)
   
-
-  
-  estXYk5 = predXY(newSignals = onlineSummary[ , 6:11],
-                   newAngles = onlineSummary[ , 4],
-                   offlineData, numAngles = 3, k = 5)
-  
-  estXYk12 = predXY(newSignals = onlineSummary[ , 6:11],
+  estXYk12w = predXY(newSignals = onlineSummary[ , 6:length(onlineSummary)],
                     newAngles = onlineSummary[ , 4],
-                    offlineData, numAngles = 3, k = 12)
-  
-  sapply(list(estXYk1, estXYk3, estXYk5, estXYk12), calcError, actualXY)
-  }
-  
-  
-  caclulate_errors_weighted = function(offlineData ){
-    macs = unique(offlineData$mac)
-    print(macs)
-    online = readData(online_file_path, subMacs = macs)
-    online$posXY = paste(online$posX, online$posY, sep = "-")
-    onlineSummary= createOnlineSummary(online)
-    
-    estXYk3 = predXYWeighted(newSignals = onlineSummary[ , 6:11],
-                     newAngles = onlineSummary[ , 4],
-                     offlineData, numAngles = 3, k = 3)
-    
-    estXYk1 = predXYWeighted(newSignals = onlineSummary[ , 6:11],
-                     newAngles = onlineSummary[ , 4],
-                     offlineData, numAngles = 3, k = 1)
-    
-    
-    
-    estXYk5 = predXYWeighted(newSignals = onlineSummary[ , 6:11],
-                     newAngles = onlineSummary[ , 4],
-                     offlineData, numAngles = 3, k = 5)
-    
-    estXYk12 = predXYWeighted(newSignals = onlineSummary[ , 6:11],
-                      newAngles = onlineSummary[ , 4],
-                      offlineData, numAngles = 3, k = 12)
-    
-    sapply(list(estXYk1, estXYk3, estXYk5, estXYk12), calcError, actualXY)
-  }
-  
-  
-  estXYk12w = predXY(newSignals = onlineSummary[ , 6:11],
-                    newAngles = onlineSummary[ , 4],
-                    offlineSummary_without_c0, numAngles = 3, k = 4)
+                    offlineSummary , numAngles = 3, k = 4)
   
   calcError(estXYk12w,actualXY )
   
-  caclulate_errors(offlineSummary_without_cd)
+  macs = unique(offlineSummary_without_cd$mac)
+  online = readData(online_file_path, subMacs = macs)
+  online$posXY = paste(online$posX, online$posY, sep = "-")
+  onlineSummary = createOnlineSummary(online)
+  
+  actualXY = onlineSummary[ , c("posX", "posY")]
+  predict_online_locations(offlineSummary_without_cd, onlineSummary)
   
   caclulate_errors(offlineSummary)
   
@@ -93,11 +49,16 @@ offline$posXY = paste(offline$posX, offline$posY, sep = "-")
   
   
   
+
+  
+  
   
   k_errors_cd = run_kkross_fold(offlineSummaryData = offlineSummary_without_cd )
   k_errors_c0 = run_kkross_fold(offlineSummaryData = offlineSummary_without_c0 )
   
   findGlobals(run_kkross_fold, merge = FALSE)$variables
+  
+  sapply(list(estXYk1, estXYk3, estXYk5, estXYk12), calcError, actualXY)
   
     
     plot(estXYk1)

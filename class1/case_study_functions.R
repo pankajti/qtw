@@ -235,8 +235,8 @@ run_kkross_fold = function(offlineSummaryData  , v = 11,
                          posXY %in% permuteLocs[ , -j])
     actualFold = onlineFold[ , c("posX", "posY")]
     for (k in 1:K) {
-      print(paste("running for  j ", j ," k ",  k))
-      estFold = predXY(newSignals = onlineFold[ , 6:11],
+      #print(paste("running for  j ", j ," k ",  k))
+      estFold = predXY(newSignals = onlineFold[ , 6:length(onlineFold)],
                        newAngles = onlineFold[ , 4],
                        offlineFold, numAngles = 3, k = k)
       err[k] = err[k] + calcError(estFold, actualFold)
@@ -247,12 +247,12 @@ run_kkross_fold = function(offlineSummaryData  , v = 11,
 
 createOnlineSummary =  function(data ){
   keepVars = c("posXY", "posX","posY", "orientation", "angle")
-  byLoc = with(online,
-               by(online, list(posXY),
+  byLoc = with(data,
+               by(data, list(posXY),
                   function(x) {
                     ans = x[1, keepVars]
                     avgSS = tapply(x$signal, x$mac, mean)
-                    y = matrix(avgSS, nrow = 1, ncol = 6,
+                    y = matrix(avgSS, nrow = 1, ncol =length(unique(data$mac)),
                                dimnames = list(ans$posXY, names(avgSS)))
                     cbind(ans, y)
                   }))
@@ -260,3 +260,26 @@ createOnlineSummary =  function(data ){
   onlineSummary
 }
  
+
+
+predict_online_locations = function(offlineData,onlineSummary, k=4 ){
+   
+  
+  
+  estXYk = predXY(newSignals = onlineSummary[ , 6:length(onlineSummary)],
+                   newAngles = onlineSummary[ , 4],
+                   offlineData, numAngles = 3, k = k)
+  return(estXYk)
+}
+
+
+predict_online_locations_weighted = function(offlineData, onlineSummary, k=4 ){
+  
+  
+  
+  estXYk = predXYWeighted(newSignals = onlineSummary[ , 6:length(onlineSummary)],
+                           newAngles = onlineSummary[ , 4],
+                           offlineData, numAngles = 3, k = k)
+  
+  return(estXYk)
+}
