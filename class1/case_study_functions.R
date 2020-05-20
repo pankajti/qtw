@@ -37,8 +37,6 @@ processLine = function(x)
 # if specified.
 readData = function(file_path , subMacs=NULL){
   txt = readLines(file_path)
-  tokens = strsplit(txt[4], "[;=,]")[[1]]
-  tmp = matrix(tokens[ - (1:10) ], ncol = 4, byrow = TRUE)
   lines = txt[ substr(txt, 1, 1) != "#" ]
   tmp = lapply(lines, processLine)
   records = as.data.frame(do.call("rbind", tmp),stringsAsFactors = FALSE)

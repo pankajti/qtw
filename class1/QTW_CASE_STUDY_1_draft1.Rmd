@@ -22,7 +22,8 @@ In order to start training models to predict location of a device, first we need
 
 ```{r warning=FALSE}
 source("case_study_functions.R", echo = T, prompt.echo = "", spaced = F)
-txt = readLines("data/offline.final.trace.txt")
+offline_file_path = "data/offline.final.trace.txt"
+txt = readLines(offline_file_path)
 length(txt)
 ```
 
@@ -32,7 +33,13 @@ We have 151392 total lines in our `txt` variable. The first few lines look like 
 txt[1:4]
 ```
 
-We now see that there are lines beginning in # that do not contain actual data, so we will discard them. Additionally, each record is all on one line in a format that we will have to parse. We split each line at the euqal signs, semicolons, and commas and picked out the data by position. Since each line contained information about the device as well as the access points, we opted to store each device-access point combination as its own line. To do this, we replicated the device information (time, MAC address, position) and appended it to the information about each access point.
+We now see that there are lines beginning in # that do not contain actual data, so we will discard them. Additionally, each record is all on one line in a format that we will have to parse. We split each line at the euqal signs, semicolons, and commas and picked out the data by position. Since each line contained information about the device as well as the access points, we opted to store each device-access point combination as its own line. To do this, we replicated the device information (time, MAC address, position) and appended it to the information about each access point. We repeated this process for each line and combined them all into one data frame with appropriate column names. Since all our variables were still characters, we converted numerical variables to the numeric class and our time variable to the POSIXct class, after converting time from milliseconds to seconds.
+
+We found that the type column contained both adhoc devices and access point devices. Since we only planned to use signal strengths from access points in our model, we discarded records of adhoc devices and deleted the type column. We found that scanMac and posZ only had one unique value each, and deleted those columns too. We found that there were angle values that were not exact multiples of 45 as expected. We rounded angle to the nearest 45 degrees to account for this, also setting values of 360 to be 0 since they are equivalent. We found that there were more access point MAC addresses than expected. Upon further inspection, it appeared that some access points were outside of the floor plan (possibly on other floors) since they had far fewer observations than expected, and these were removed. There also appeared to be two MAC addresses ending in c0 and cd in the same location, i.e., for the same access point. We left both of these in and will examine this in a later section. Lastly, we found there was a one-to-one correspondence between MAC address and channel, so we removed the channel column. All of this data preparation is handled by the function `readData`, which can be found in `case_study_functions.R`.
+
+```{r}
+offline = readData(offline_file_path)
+```
 
 #### Explore orientation 
 
