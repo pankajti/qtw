@@ -35,6 +35,11 @@ txt = readLines("/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.t
 
 ```
 
+
+```{r}
+txt[4]
+```
+
 ```{r}
 length(txt)
 
@@ -482,6 +487,12 @@ knitr::opts_chunk$set(
 
 
 ### cross validation 
+ 
+```{r}
+  k_errors = run_kkross_fold(offlineSummaryData = offlineSummary )
+    plot(k_errors, type = 'l')
+k_errors
+```
  
 
 ```{r}
