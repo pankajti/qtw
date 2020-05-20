@@ -5,33 +5,38 @@ library(codetools)
 library(lattice)
 
 
-offline_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt"
-online_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/online.final.trace.txt"
+offline_file_path = "data/offline.final.trace.txt"
+online_file_path = "data/online.final.trace.txt"
 
-
+# Rounds an angle to the nearest 45 degree angle (setting 360 to 0)
 roundOrientation = function(angles) {
   refs = seq(0, by = 45, length = 9)
   q = sapply(angles, function(o) which.min(abs(o - refs)))
   c(refs[1:8], 0)[q]
 }
 
+# Splits a line in the data file at these symbols ; = ,
+# Turns result into a matrix with handheld device information and
+# MAC address and signal strength information
 processLine = function(x)
 {
   tokens = strsplit(x, "[;=,]")[[1]]
   if (length(tokens) == 10)
     return(NULL)
-  tmp = matrix(tokens[ - (1:10) ], , 4, byrow = TRUE)
+  tmp = matrix(tokens[ - (1:10) ], ncol = 4, byrow = TRUE)
   cbind(matrix(tokens[c(2, 4, 6:8, 10)], nrow(tmp), 6,
                byrow = TRUE), tmp)
 }
 
 
-
+# Reads data from a file, parses each line, compresses into a data.frame
+# with appropriate column names and classes. Discards measurements of
+# type 1 (adhoc) and deletes type column. Converts time from ms to s.
+# Deletes scanMac, posZ, and channel columns. Rounds angle to nearest 45.
+# Deletes MAC addresses not in the top 7 most frequent, or not in subMacs
+# if specified.
 readData = function(file_path , subMacs=NULL){
   txt = readLines(file_path)
-  unlist(lapply(strsplit(txt[4], ";")[[1]],
-                function(x)
-                  sapply(strsplit(x, "=")[[1]], strsplit, ",")))
   tokens = strsplit(txt[4], "[;=,]")[[1]]
   tmp = matrix(tokens[ - (1:10) ], ncol = 4, byrow = TRUE)
   lines = txt[ substr(txt, 1, 1) != "#" ]
@@ -55,32 +60,24 @@ readData = function(file_path , subMacs=NULL){
   }
   records = records[ records$mac %in% subMacs, ]
   records = records[ , "channel" != names(records)]
-  records
+  return(records)
 } 
 
+# Creates contour plot of signal strength
 surfaceSS = function(data, mac, angle){
-  
   oneAPAngle = subset(data,
                       mac == mac & angle == angle)
-  
   smoothSS = Tps(oneAPAngle[, c("posX","posY")],
                  oneAPAngle$avgSignal)
-  
-  
   vizSmooth = predictSurface(smoothSS)
-  
   plot.surface(vizSmooth, type = "C")
-  
-  
   points(oneAPAngle$posX, oneAPAngle$posY, pch=19, cex = 0.5)
-  
 }
  
 
 reshapeSS = function(data, varSignal = "signal",
                      keepVars = c("posXY", "posX","posY"), sampleAngle= FALSE) {
   refs = seq(0, by = 45, length = 8)
-  
   byLocation =
     with(data, by(data, list(posXY),
                   function(x) {
@@ -95,14 +92,14 @@ reshapeSS = function(data, varSignal = "signal",
                     cbind(ans, y)
                   }))
   newDataSS = do.call("rbind", byLocation)
-  
   return(newDataSS)
 }
 
-
+# Creates summary statistics for each location/angle/MAC combination
 createSummary = function(data) {
   data$posXY = paste(data$posX, data$posY, sep = "-")
-  
+  # Separates data frame into several data frames, each with the same
+  # (posXY, angle, mac) combination
   byLocAngleAP = with(data,
                       by(data, list(posXY, angle, mac),
                          function(x) x))
@@ -118,15 +115,15 @@ createSummary = function(data) {
              ans$iqrSignal = IQR(oneLoc$signal)
              ans
            })
+  # Combine data frames
   dataSummary = do.call("rbind", signalSummary)
-  dataSummary
+  return(dataSummary)
 }
 
+# Subsets training data for m closest orientations
 selectTrain = function(angleNewObs, offlineSummary, m){
-  
   ## todo check below
   nearestAngle = roundOrientation(angleNewObs)
-  
   if (m %% 2 == 1) {
     angles = seq(-45 * (m - 1) /2, 45 * (m - 1) /2, length = m)
   } else {
@@ -137,31 +134,26 @@ selectTrain = function(angleNewObs, offlineSummary, m){
     else
       angles = angles[ -m ]
   }
-  
-  
-  
   angles = angles + nearestAngle
   angles[angles < 0] = angles[ angles < 0 ] + 360
   angles[angles > 360] = angles[ angles > 360 ] - 360
-  
-  
   offlineSubset =
     offlineSummary[ offlineSummary$angle %in% angles, ]
-  
   trainSS = reshapeSS(offlineSubset, varSignal = "avgSignal")
-  trainSS
-  
+  return(trainSS)
 }
 
+# Sorts training subset by Euclidean distance to input signal newSignal
 findNN = function(newSignal, trainSubset) {
   diffs = apply(trainSubset[ , 4:9], 1,
                 function(x) x - newSignal)
   dists = apply(diffs, 2, function(x) sqrt(sum(x^2)) )
   closest = order(dists)
-  
   return(trainSubset[closest, 1:3 ])
 }
 
+# Sorts training subset by Euclidean distance to input signal newSignal,
+# then assigns weights by (1/d_i)/(sum[i=1:k](1/d_i))
 findNNWeight = function(newSignal, trainSubset, k ) {
   diffs = apply(trainSubset[ , 4:9], 1,
                 function(x) x - newSignal)
@@ -172,44 +164,47 @@ findNNWeight = function(newSignal, trainSubset, k ) {
   weights = inv_sorted_dist/(sum(inv_sorted_dist[1:k]))
   closest_weight = trainSubset[closest, 1:3 ]
   closest_weight$weights = weights
-  closest_weight$weighted_X = weights*closest_weight$posX
-  closest_weight$weighted_Y = weights*closest_weight$posY
-  
   return(closest_weight)
 }
 
-
+# For each new row of signals and angles, finds nearest k neighbors in
+# training set using numAngles closest angles and predicts position
+# by averaging positions of the neighbors
 predXY = function(newSignals, newAngles, trainData,
                   numAngles = 1, k = 3){
-  closeXY = list(length = nrow(newSignals))
+  closeXY = vector("list", length = nrow(newSignals))
   for (i in 1:nrow(newSignals)) {
     trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
     closeXY[[i]] =
       findNN(newSignal = as.numeric(newSignals[i, ]), trainSS)
   }
-  
-  estXY = lapply(closeXY, function(x) sapply(x[ , 2:3],
-                                             function(x) mean(x[1:k])))
+  avgPosition = function(x){
+    sapply(x[,2:3], function(x) mean(x[1:k]))
+  }
+  estXY = lapply(closeXY, avgPosition)
   estXY = do.call("rbind", estXY)
   return(estXY)
 }
 
-
+# Same as predXY but uses weighted average
 predXYWeighted = function(newSignals, newAngles, trainData,
                   numAngles = 1, k = 3){
-  closeXY = list(length = nrow(newSignals))
+  closeXY = vector("list", length = nrow(newSignals))
   for (i in 1:nrow(newSignals)) {
     trainSS = selectTrain(newAngles[i], trainData, m = numAngles)
     closeXY[[i]] =
       findNNWeight(newSignal = as.numeric(newSignals[i, ]), trainSS, k)
   }
-  
-  estXY = lapply(closeXY, function(x) sapply(x[ , 5:6],
-                                             function(x) mean(x[1:k] )))
+  avgWeightedPosition = function(x){
+    weights = x[1:k,4]
+    sapply(x[,2:3], function(y) sum(y[1:k]*weights)/sum(weights))
+  }
+  estXY = lapply(closeXY, avgWeightedPosition)
   estXY = do.call("rbind", estXY)
   return(estXY)
 }
 
+# Calculates mean squared error between predicted and actual positions
 calcError =
   function(estXY, actualXY)
     sum( rowSums( (estXY - actualXY)^2) )

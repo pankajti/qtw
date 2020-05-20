@@ -1,6 +1,6 @@
 ---
-title: "QTW_CASE_STUDY_1"
-author: "Pankaj Kumar"
+title: "Case Study 1: Indoor Positioning System"
+author: "Pankaj Kumar, Brady Arendale, Kay Ayala"
 date: "5/14/2020"
 output: html_document
 ---
@@ -8,55 +8,31 @@ output: html_document
 ```{r , include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Introduction 
+# Introduction 
 
-The case study is about the precition of handheld device location based on its signal strength 
+We want to know if it is possible to accurately determine position on the floor of a building using a mobile device to measure signal strength from various access points. Researchers at the University of Mannheim created a dataset for this purpose. The dataset was created by standing at certain locations, holding a device at certain orientations, and repeatedly measuring signal strength to several access points. The floor plan is shown below [1]:
 
-The data is provided in followin format  : 
+![Floor layout](data/layout.png)
 
-![layeout](../class1/data/layout.png)
+There are a total of 166 locations, spaced one meter apart. The researchers held the device at 8 different orientations, in increments of 45 degrees. For each combination of location and orientation, the researchers recorded 110 measurements to each of 6 access points.
 
-There are 6 points where data is recorded from 166 different locations. on each location 
+# Data Preparation
 
+In order to start training models to predict location of a device, first we needed to get our data into a usable form. We first read the entire `offline.final.trace.txt` file into a character variable called `txt`.
 
-
-
-### Data 
-
-
-```{r }
+```{r warning=FALSE}
 source("case_study_functions.R", echo = T, prompt.echo = "", spaced = F)
-```
-
-
-```{r}
-
-txt = readLines("/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt")
-
-```
-
-
-```{r}
-txt[4]
-```
-
-```{r}
+txt = readLines("data/offline.final.trace.txt")
 length(txt)
-
-strsplit(txt[4], ";")[[1]]
-
-
 ```
+
+We have 151392 total lines in our `txt` variable. The first few lines look like this:
 
 ```{r}
-unlist(lapply(strsplit(txt[4], ";")[[1]],
-              function(x)
-                sapply(strsplit(x, "=")[[1]], strsplit, ",")))
-
+txt[1:4]
 ```
 
-
-*** As we can see there are 151392 total records.
+We now see that there are lines beginning in # that do not contain actual data, so we will discard them. Additionally, each record is all on one line in a format that we will have to parse. We split each line at the euqal signs, semicolons, and commas and picked out the data by position. Since each line contained information about the device as well as the access points, we opted to store each device-access point combination as its own line. To do this, we replicated the device information (time, MAC address, position) and appended it to the information about each access point.
 
 #### Explore orientation 
 
@@ -196,8 +172,8 @@ We define function readData using above findings to collect offline data and we 
 
 ```{r}
 
-offline_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/offline.final.trace.txt"
-online_file_path = "/Users/pankaj/dev/git/smu/qtw/class1/data/online.final.trace.txt"
+offline_file_path = "data/offline.final.trace.txt"
+online_file_path = "data/online.final.trace.txt"
 
 offline = readData(offline_file_path)
 
@@ -487,12 +463,6 @@ knitr::opts_chunk$set(
 
 
 ### cross validation 
- 
-```{r}
-  k_errors = run_kkross_fold(offlineSummaryData = offlineSummary )
-    plot(k_errors, type = 'l')
-k_errors
-```
  
 
 ```{r}
