@@ -72,7 +72,7 @@ surfaceSS = function(data, mac, angle){
   points(oneAPAngle$posX, oneAPAngle$posY, pch=19, cex = 0.5)
 }
  
-
+# Reshapes data into the form posXY, posX, posY, MAC address average signal strengths
 reshapeSS = function(data, varSignal = "signal",
                      keepVars = c("posXY", "posX","posY"), sampleAngle= FALSE) {
   refs = seq(0, by = 45, length = 8)
@@ -202,10 +202,10 @@ predXYWeighted = function(newSignals, newAngles, trainData,
   return(estXY)
 }
 
-# Calculates mean squared error between predicted and actual positions
-calcError =
-  function(estXY, actualXY)
-    sum( rowSums( (estXY - actualXY)^2) )
+# Calculates average squared error between predicted and actual positions
+calcError = function(estXY, actualXY) {
+  mean( rowSums( (estXY - actualXY)^2) )
+}
 
 
 run_kkross_fold = function(offlineSummaryData  , v = 11,
@@ -235,7 +235,8 @@ run_kkross_fold = function(offlineSummaryData  , v = 11,
       err[k] = err[k] + calcError(estFold, actualFold)
     }
   }
-  err
+  # Take average of ASEs for each K
+  return(err/v)
 }
 
 createOnlineSummary =  function(data ){
