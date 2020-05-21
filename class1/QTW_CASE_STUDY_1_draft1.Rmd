@@ -215,4 +215,24 @@ knitr::opts_chunk$set(
     
 ```
 
+
+
+### 5.	What is (are) the drawback(s) (if any of using this method to real-time locate an object)?
+
+Few drawbacks we identified  strength can vary based on device (e.g. WiFi chip)
+so a possible solution could be to standardize, scale, or rank signal strengths so it doesn't affect predictions too much
+We also assumed that signals are independent and the presense of one device doesn;t affect other. There could be some relation between based on data and we can try to figure out possible correlation.
+Euclidean distance might not be correct metric for predicting XY values.  We can use Manhattan Distance or others. 
+We are using knn which is one of the simplest approach and neighbourhood based clusterning might not be most appropriate one,
+
+
+### 6.	Describe a method that may be an improvement based on your perceived drawbacks.
+
+We can use methods to handle each of the drawbacks identified above. 
+Some data normalization and transformation can be done  to handle problem of varying signal strengthe of devices. 
+We can also do some correlation analysis between different variable  to find any data dependence . 
+Different distance functions can be used to analyse the impact of metric. We can use Manhattan Distance or others. 
+We may use SVM to better classify data around more appropriate boundries and compare results with knn approach.  
+
+
  
