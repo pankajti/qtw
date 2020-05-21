@@ -204,8 +204,7 @@ plot_predicted_locations(predicted_locations, actualXY, train_points)
 paste("Test ASE:", calcError(predicted_locations,actualXY))
 ```
 
-
-## Results
+# Results
 
 We found that weighted k-NN without c0 had the best fit on the test data, with a test ASE of 4.139. This model found the closest 7 neighbors to each online record in terms of Euclidean distance and took a weighted average of their position. Examining the plot for this model shows that most of our predictions are very close, and the ones with the higest error are still in the same general area of the hall. This shows that this could be a reasonably useful model in determining the location of a device on this floor.
 

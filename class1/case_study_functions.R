@@ -208,8 +208,8 @@ calcError = function(estXY, actualXY) {
 }
 
 
-run_kkross_fold = function(offlineSummaryData  , v = 11,
-                             K = 20)
+run_kkross_fold = function(offlineSummaryData  , v = 10,
+                             K = 15)
 {
   permuteLocs = sample(unique(offlineSummaryData$posXY))
   permuteLocs = matrix(permuteLocs, ncol = v,
@@ -220,7 +220,7 @@ run_kkross_fold = function(offlineSummaryData  , v = 11,
                               sampleAngle = TRUE)
   
   
-  err = rep(0, K)
+  err = numeric(K)
   for (j in 1:v) {
     onlineFold = subset(onlineCVSummary,
                         posXY %in% permuteLocs[ , j]) 
@@ -239,7 +239,39 @@ run_kkross_fold = function(offlineSummaryData  , v = 11,
   return(err/v)
 }
 
+run_kkross_fold_weighted = function(offlineSummaryData  , v = 10,
+                           K = 15)
+{
+  permuteLocs = sample(unique(offlineSummaryData$posXY))
+  permuteLocs = matrix(permuteLocs, ncol = v,
+                       nrow = floor(length(permuteLocs)/v))
+  
+  keepVars = c("posXY", "posX","posY", "orientation", "angle")
+  onlineCVSummary = reshapeSS(offlineSummaryData, keepVars = keepVars,
+                              sampleAngle = TRUE)
+  
+  
+  err = numeric(K)
+  for (j in 1:v) {
+    onlineFold = subset(onlineCVSummary,
+                        posXY %in% permuteLocs[ , j]) 
+    offlineFold = subset(offlineSummaryData,
+                         posXY %in% permuteLocs[ , -j])
+    actualFold = onlineFold[ , c("posX", "posY")]
+    for (k in 1:K) {
+      #print(paste("running for  j ", j ," k ",  k))
+      estFold = predXYWeighted(newSignals = onlineFold[ , 6:length(onlineFold)],
+                       newAngles = onlineFold[ , 4],
+                       offlineFold, numAngles = 3, k = k)
+      err[k] = err[k] + calcError(estFold, actualFold)
+    }
+  }
+  # Take average of ASEs for each K
+  return(err/v)
+}
+
 createOnlineSummary =  function(data ){
+  data$posXY = paste(data$posX, data$posY, sep = "-")
   keepVars = c("posXY", "posX","posY", "orientation", "angle")
   byLoc = with(data,
                by(data, list(posXY),
@@ -276,4 +308,15 @@ predict_online_locations_weighted = function(offlineData, onlineSummary, k=4 ){
                            offlineData, numAngles = 3, k = k)
   
   return(estXYk)
+}
+
+# Plots predicted locations vs. actual locations, drawing a line between each pair
+plot_predicted_locations = function(predictedXY, actualXY, train_points) {
+  plot(predictedXY, pch=19, ylim=c(0,13), main="Predicted vs. actual locations")
+  points(actualXY, col="red")
+  for (i in 1:nrow(predictedXY)) {
+    xy_coords = rbind(predictedXY[i,], actualXY[i,])
+    lines(xy_coords, col="red")
+  }
+  points(train_points, col="gray")
 }
