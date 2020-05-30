@@ -381,6 +381,221 @@ $(document).ready(function () {
 </div>
 
 
+<pre class="python"><code>import re
+from io import StringIO
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import urllib3
+import os
+import urllib
+import re
+
+#### From text
+menURLs = [
+    &quot;results/1999/cb99m.html&quot;,
+    &quot;results/2000/cb003m.htm&quot;,
+    &quot;results/2001/oof_m.html&quot;,
+    &quot;results/2002/oofm.htm&quot;,
+    &quot;results/2003/CB03-M.HTM&quot;,
+    &quot;results/2004/men.htm&quot;,
+    &quot;results/2005/CB05-M.htm&quot;,
+    &quot;results/2006/men.htm&quot;,
+    &quot;results/2007/men.htm&quot;,
+    &quot;results/2008/men.htm&quot;,
+    &quot;results/2009/09cucb-M.htm&quot;,
+    &quot;results/2010/2010cucb10m-m.htm&quot;,
+    &quot;results/2011/2011cucb10m-m.htm&quot;,
+    &quot;results/2012/2012cucb10m-m.htm&quot;]
+
+
+womenURLs = [
+    &quot;results/1999/cb99f.html&quot;,
+    &quot;results/2000/cb003f.htm&quot;,
+    &quot;results/2001/oof_f.html&quot;,
+    &quot;results/2002/ooff.htm&quot;,
+    &quot;results/2003/CB03-F.HTM&quot;,
+    &quot;results/2004/women.htm&quot;,
+    &quot;results/2005/CB05-F.htm&quot;,
+    &quot;results/2006/women.htm&quot;,
+    &quot;results/2007/women.htm&quot;,
+    &quot;results/2008/women.htm&quot;,
+    &quot;results/2009/09cucb-F.htm&quot;,
+    &quot;results/2010/2010cucb10m-f.htm&quot;,
+    &quot;results/2011/2011cucb10m-f.htm&quot;,
+    &quot;results/2012/2012cucb10m-f.htm&quot;]
+
+## columns with same meaning but different names will be mapped to just one
+columns_dict = {'AG': 'AGE',
+'Ag':'AGE',
+
+'GUN': 'GUN_TIME',
+'GUN TIM':'GUN_TIME',
+'Gun':'GUN_TIME',
+'Gun Tim':'GUN_TIME',
+
+'HOMETOWN': 'HOMETOWN',
+'Hometown':'HOMETOWN',
+
+'NAME': 'NAME',
+'Name': 'NAME',
+
+'NET':'TIME',
+'NET TIM':'TIME',
+'Net':'TIME',
+'Net Tim':'TIME',
+'Net Tim  ':'TIME',
+'TIME':'TIME',
+'Time':'TIME'}
+
+ubase = &quot;http://www.cherryblossom.org/&quot;
+data_home = r'./race_data'</code></pre>
+<pre class="python"><code>
+
+def scrap_runs(urls, gender):
+    for rel_url in urls:
+        url = urllib.parse.urljoin(ubase, rel_url)
+        year = re.search('/(\d{4})', url)[0][1:]
+        print(&quot;scrapping data from {} for {}&quot;.format(url, gender))
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content)
+        if year == '2000':
+            result = soup.find(face=&quot;Courier New&quot;).get_text()
+        ## there us some special handling for men data for year 2000
+        elif year == '2009' and gender == 'men':
+            result = soup.find(class_=&quot;Section1&quot;).get_text()
+        else:
+            result = soup.find('pre').get_text()
+        with open(os.path.join(data_home, '{}_{}.txt'.format(gender, year)),
+                  'w+') as f:
+            ## for year 2001 headers are not present for women's result. adding them explicitly 
+            if year == '2001' and gender == 'women':
+                f.writelines('PLACE DIV   NAME                  AG HOMETOWN           GUN TIM  NET TIM\n')
+                f.writelines('===== ===== ===================== == ================== =======  =======\n')
+            f.writelines(result)
+            
+            
+            </code></pre>
+<pre class="python"><code>
+def create_df(gender):
+    final_file_path = os.path.join(data_home,'final_{}.csv'.format(gender))
+
+    all_columns = set()
+    all_dfs = {}
+    for year in range(1999, 2013):
+        print(&quot;processing file for year {} gender {}&quot;.format(year, gender))
+        with open(os.path.join(data_home, '{}_{}.txt'.format(gender, year)), 'r') as f:
+            lines = f.readlines()
+            for idx, line in enumerate(lines):
+                if line.startswith('='):
+                    print(year, line)
+                    # split on   line starting with =  to determine width of data
+                    w = [len(s) + 1 for s in line.split(&quot; &quot;)]
+                    df = pd.read_fwf(StringIO(&quot;\n&quot;.join(lines[(idx - 1):])), widths=w)
+                    df.dropna(axis=0, how='all', inplace=True)
+                    all_dfs[year] = df
+                    all_columns.update(df.columns)
+                    ## usually either net time ot time is present in data. for 2011 women both columns are 
+                    #present with duplciate values. dropping one of them 
+                    if gender =='women' and year ==2011:
+                        df.drop('Time', axis=1, inplace=True)
+  
+    cleaned_df = []
+    for key in all_dfs.keys():
+        df = all_dfs[key]
+        adf = df.rename(dict(zip(df.columns, [x.strip() for x in df.columns])), axis=1)
+        cols = {x: columns_dict[x] for x in adf.columns if x in columns_dict}
+        adf = adf.rename(cols, axis=1)
+        adf = adf[~adf['NAME'].str.startswith('==')]
+        ## adding year column so that we can create one dataframe in the end
+        adf['YEAR'] = int(key)
+        cleaned_df.append(adf)
+    final_df = pd.concat(cleaned_df)[['YEAR', 'NAME', 'AGE', 'TIME', 'GUN_TIME', 'HOMETOWN']]
+    final_df.to_csv(final_file_path)
+    return final_file_path
+
+
+def convert_to_float (str):
+    try:
+        return float(str)
+    except :
+        return 0</code></pre>
+<pre class="python"><code>
+gender = 'women'
+scrap_runs(womenURLs, gender)</code></pre>
+<pre><code>## scrapping data from http://www.cherryblossom.org/results/1999/cb99f.html for women
+## scrapping data from http://www.cherryblossom.org/results/2000/cb003f.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2001/oof_f.html for women
+## scrapping data from http://www.cherryblossom.org/results/2002/ooff.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2003/CB03-F.HTM for women
+## scrapping data from http://www.cherryblossom.org/results/2004/women.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2005/CB05-F.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2006/women.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2007/women.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2008/women.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2009/09cucb-F.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2010/2010cucb10m-f.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2011/2011cucb10m-f.htm for women
+## scrapping data from http://www.cherryblossom.org/results/2012/2012cucb10m-f.htm for women</code></pre>
+<pre class="python"><code>final_file_path = create_df(gender)</code></pre>
+<pre><code>## processing file for year 1999 gender women
+## 1999 ===== ========= ===================== == ================== ======= ===== 
+## 
+## processing file for year 2000 gender women
+## 2000 ===== ========= ===== ===================== == ================== =======  ======= 
+## 
+## processing file for year 2001 gender women
+## 2001 ===== ===== ===================== == ================== =======  =======
+## 
+## processing file for year 2002 gender women
+## 2002 ===== ===== ===================== == ================== ======= ======= 
+## 
+## processing file for year 2003 gender women
+## 2003 ===== ========= ===== ============================= == =================== =======  ======= 
+## 
+## processing file for year 2004 gender women
+## 2004 ===== ========= ===== ============================= == =================== ======= ======= 
+## 
+## processing file for year 2005 gender women
+## 2005 ===== ========= ====================== == ================== ======= ======= ===== 
+## 
+## processing file for year 2006 gender women
+## 2006 ===== ======== ====== ====================== == ======================= =======  ===== = 
+## 
+## processing file for year 2007 gender women
+## 2007 ===== =========== ====== ====================== == ================== =======  ===== = ======= 
+## 
+## processing file for year 2008 gender women
+## 2008 ===== =========== ====== ====================== == ================== ======= ===== ======= ===== ======= ===== 
+## 
+## processing file for year 2009 gender women
+## 2009 ===== =========== ====== ====================== == ==================== ======= =======  ===== = 
+## 
+## processing file for year 2010 gender women
+## 2010 ===== =========== ====== ====================== == ==================== ======= ======= =======  ===== = 
+## 
+## processing file for year 2011 gender women
+## 2011 ===== =========== ====== ====================== == ==================== ======= ======= ======= ===== = 
+## 
+## processing file for year 2012 gender women
+## 2012 ===== =========== ====== ====================== == ==================== ======= ======= ===== = 
+## 
+## 
+## /Users/pankaj/anaconda/envs/r-reticulate/bin/python:34: FutureWarning: Sorting because non-concatenation axis is not aligned. A future version
+## of pandas will change to not sort by default.
+## 
+## To accept the future behavior, pass 'sort=False'.
+## 
+## To retain the current behavior and silence the warning, pass 'sort=True'.</code></pre>
+<pre class="python"><code>processed_file = os.path.join(data_home,'processed_{}.csv'.format(gender))
+df = pd.read_csv(final_file_path)
+df['AGE'] =  df.AGE.apply(convert_to_float)
+df['AGE'].fillna(0, inplace=True)
+df['TOTAL_TIME'] =  df['TIME'].fillna(df['GUN_TIME'])
+df.to_csv(processed_file)
+
+print(processed_file)</code></pre>
+<pre><code>## ./race_data/processed_women.csv</code></pre>
 <pre class="r"><code>female_table %&gt;%   mutate (YEAR_R = as.factor(YEAR))   %&gt;%
 ggplot(mapping = aes(x= YEAR_R, y= AGE))+
   geom_boxplot()</code></pre>

@@ -6,6 +6,173 @@ output: html_document
 ---
 
 
+```{python}
+import re
+from io import StringIO
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import urllib3
+import os
+import urllib
+import re
+
+#### From text
+menURLs = [
+    "results/1999/cb99m.html",
+    "results/2000/cb003m.htm",
+    "results/2001/oof_m.html",
+    "results/2002/oofm.htm",
+    "results/2003/CB03-M.HTM",
+    "results/2004/men.htm",
+    "results/2005/CB05-M.htm",
+    "results/2006/men.htm",
+    "results/2007/men.htm",
+    "results/2008/men.htm",
+    "results/2009/09cucb-M.htm",
+    "results/2010/2010cucb10m-m.htm",
+    "results/2011/2011cucb10m-m.htm",
+    "results/2012/2012cucb10m-m.htm"]
+
+
+womenURLs = [
+    "results/1999/cb99f.html",
+    "results/2000/cb003f.htm",
+    "results/2001/oof_f.html",
+    "results/2002/ooff.htm",
+    "results/2003/CB03-F.HTM",
+    "results/2004/women.htm",
+    "results/2005/CB05-F.htm",
+    "results/2006/women.htm",
+    "results/2007/women.htm",
+    "results/2008/women.htm",
+    "results/2009/09cucb-F.htm",
+    "results/2010/2010cucb10m-f.htm",
+    "results/2011/2011cucb10m-f.htm",
+    "results/2012/2012cucb10m-f.htm"]
+
+## columns with same meaning but different names will be mapped to just one
+columns_dict = {'AG': 'AGE',
+'Ag':'AGE',
+
+'GUN': 'GUN_TIME',
+'GUN TIM':'GUN_TIME',
+'Gun':'GUN_TIME',
+'Gun Tim':'GUN_TIME',
+
+'HOMETOWN': 'HOMETOWN',
+'Hometown':'HOMETOWN',
+
+'NAME': 'NAME',
+'Name': 'NAME',
+
+'NET':'TIME',
+'NET TIM':'TIME',
+'Net':'TIME',
+'Net Tim':'TIME',
+'Net Tim  ':'TIME',
+'TIME':'TIME',
+'Time':'TIME'}
+
+ubase = "http://www.cherryblossom.org/"
+data_home = r'./race_data'
+```
+
+```{python}
+
+
+def scrap_runs(urls, gender):
+    for rel_url in urls:
+        url = urllib.parse.urljoin(ubase, rel_url)
+        year = re.search('/(\d{4})', url)[0][1:]
+        print("scrapping data from {} for {}".format(url, gender))
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content)
+        if year == '2000':
+            result = soup.find(face="Courier New").get_text()
+        ## there us some special handling for men data for year 2000
+        elif year == '2009' and gender == 'men':
+            result = soup.find(class_="Section1").get_text()
+        else:
+            result = soup.find('pre').get_text()
+        with open(os.path.join(data_home, '{}_{}.txt'.format(gender, year)),
+                  'w+') as f:
+            ## for year 2001 headers are not present for women's result. adding them explicitly 
+            if year == '2001' and gender == 'women':
+                f.writelines('PLACE DIV   NAME                  AG HOMETOWN           GUN TIM  NET TIM\n')
+                f.writelines('===== ===== ===================== == ================== =======  =======\n')
+            f.writelines(result)
+            
+            
+            
+```
+
+
+```{python}
+
+def create_df(gender):
+    final_file_path = os.path.join(data_home,'final_{}.csv'.format(gender))
+
+    all_columns = set()
+    all_dfs = {}
+    for year in range(1999, 2013):
+        print("processing file for year {} gender {}".format(year, gender))
+        with open(os.path.join(data_home, '{}_{}.txt'.format(gender, year)), 'r') as f:
+            lines = f.readlines()
+            for idx, line in enumerate(lines):
+                if line.startswith('='):
+                    print(year, line)
+                    # split on   line starting with =  to determine width of data
+                    w = [len(s) + 1 for s in line.split(" ")]
+                    df = pd.read_fwf(StringIO("\n".join(lines[(idx - 1):])), widths=w)
+                    df.dropna(axis=0, how='all', inplace=True)
+                    all_dfs[year] = df
+                    all_columns.update(df.columns)
+                    ## usually either net time ot time is present in data. for 2011 women both columns are 
+                    #present with duplciate values. dropping one of them 
+                    if gender =='women' and year ==2011:
+                        df.drop('Time', axis=1, inplace=True)
+  
+    cleaned_df = []
+    for key in all_dfs.keys():
+        df = all_dfs[key]
+        adf = df.rename(dict(zip(df.columns, [x.strip() for x in df.columns])), axis=1)
+        cols = {x: columns_dict[x] for x in adf.columns if x in columns_dict}
+        adf = adf.rename(cols, axis=1)
+        adf = adf[~adf['NAME'].str.startswith('==')]
+        ## adding year column so that we can create one dataframe in the end
+        adf['YEAR'] = int(key)
+        cleaned_df.append(adf)
+    final_df = pd.concat(cleaned_df)[['YEAR', 'NAME', 'AGE', 'TIME', 'GUN_TIME', 'HOMETOWN']]
+    final_df.to_csv(final_file_path)
+    return final_file_path
+
+
+def convert_to_float (str):
+    try:
+        return float(str)
+    except :
+        return 0
+
+```
+
+
+```{python}
+
+gender = 'women'
+scrap_runs(womenURLs, gender)
+final_file_path = create_df(gender)
+processed_file = os.path.join(data_home,'processed_{}.csv'.format(gender))
+df = pd.read_csv(final_file_path)
+df['AGE'] =  df.AGE.apply(convert_to_float)
+df['AGE'].fillna(0, inplace=True)
+df['TOTAL_TIME'] =  df['TIME'].fillna(df['GUN_TIME'])
+df.to_csv(processed_file)
+
+print(processed_file)
+
+```
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -13,7 +180,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 
-female_table = read_csv('/Users/pankaj/dev/git/smu/qtw/case_study2/race_data/processed_women.csv')
+female_table = read_csv('./race_data/processed_women.csv')
 
 ```
 
