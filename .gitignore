@@ -129,3 +129,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .Rproj.user
+class1/.RData
+class1/.Rhistory
