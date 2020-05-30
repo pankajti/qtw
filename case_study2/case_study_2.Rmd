@@ -1,0 +1,45 @@
+---
+title: "case study2"
+author: "Pankaj, Brady , Kay "
+date: "5/28/2020"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+
+female_table = read_csv('/Users/pankaj/dev/git/smu/qtw/case_study2/race_data/processed_women.csv')
+
+```
+
+
+```{r}
+
+female_table %>%   mutate (YEAR_R = as.factor(YEAR))   %>%
+ggplot(mapping = aes(x= YEAR_R, y= AGE))+
+  geom_boxplot()
+
+
+female_table %>%   mutate (YEAR_R = as.factor(YEAR))   %>%
+ggplot(  mapping = aes(x= AGE , fill = YEAR_R))+
+ geom_bar()
+
+
+female_table %>%   mutate (YEAR_R = as.factor(YEAR))   %>%
+  ggplot(  mapping = aes(x= AGE , color = YEAR_R ))+
+  geom_density()
+
+
+
+p <-  female_table %>%   mutate (YEAR_R = as.factor(YEAR)) %>%
+  filter(AGE>10 ) %>% 
+  ggplot(aes(sample = AGE, color = YEAR_R))
+p + stat_qq() + stat_qq_line()
+
+```
+
