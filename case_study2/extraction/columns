@@ -1,0 +1,21 @@
+'AG': 'AGE',
+'Ag':'AGE',
+
+'GUN': 'GUN_TIME',
+'GUN TIM':'GUN_TIME',
+'Gun':'GUN_TIME',
+'Gun Tim':'GUN_TIME',
+
+'HOMETOWN': 'HOMETOWN',
+'Hometown':'HOMETOWN',
+
+'NAME': 'NAME',
+'Name': 'NAME',
+
+'NET':'TIME',
+'NET TIM':'TIME',
+'Net':'TIME',
+'Net Tim':'TIME',
+'Net Tim  ':'TIME',
+'TIME':'TIME',
+'Time':'TIME'
