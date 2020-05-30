@@ -36,6 +36,7 @@ def create_df(gender):
             for idx, line in enumerate(lines):
                 if line.startswith('='):
                     print(year, line)
+                    # split =- line to determine width of data
                     w = [len(s) + 1 for s in line.split(" ")]
                     df = pd.read_fwf(StringIO("\n".join(lines[(idx - 1):])), widths=w)
                     df.dropna(axis=0, how='all', inplace=True)
