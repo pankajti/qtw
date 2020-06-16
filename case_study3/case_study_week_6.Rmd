@@ -113,6 +113,46 @@ fancyRpartPlot(emailDFrp.rp1, main="Decision Tree Graph With 2 variables ")
 ```
 
 
+### Grid search for tree model 
+
+```{r}
+
+train.control <- trainControl(
+  method = "repeatedcv",
+  number = 10, ## 10-fold CV
+  repeats = 3,## repeated three times
+  # USE AUC
+  summaryFunction = twoClassSummary, 
+  classProbs = TRUE
+)
+
+tune.gridcart <- expand.grid(maxdepth = 2:15)
+
+#tune.gridcart <- expand.grid(cp = seq(2,10))
+
+
+system.time (rpartFit2 <- train(isSpam ~ . ,                         
+                                data = emailDFrp,
+                                method = "rpart2", 
+                                tuneGrid =tune.gridcart,
+                                trControl = train.control,
+                                metric = "ROC", na.action = na.pass
+))
+
+
+
+rpartFit2 
+
+plot(rpartFit2)
+
+
+```
+
+
+From above grid search it looks like ROC curve area increases with number of depth but the increase is not much after max depth 6. so that one we ll choose for our final model 
+
+
+
 #### Tree Model with all variables 
 
 ``` {r}
@@ -129,7 +169,7 @@ emailDFrp.rp <-rpart(isSpam ~ . ,                         # formula
                      minbucket = 2,
                      # provided each sub-node
                      # contains at least 2 obs.
-                     control=rpart.control(maxdepth=10)
+                     control=rpart.control(maxdepth=6)
 )
 
 
@@ -149,7 +189,9 @@ fancyRpartPlot(emailDFrp.rp, main="Decision Tree Graph")
 
 ```
  
-####  confusion matrix for model based on all vars 
+#### Evaluation of Model :
+
+confusion matrix for model based on all vars 
 
 ```{r}
 
@@ -168,8 +210,18 @@ confusionMatrix(cm)
 
 ```
 
+### Variables that are most important for the model we found with grid search 
+
+```{r}
+
+emailDFrp.rp$variable.importance
+
+```
+
 
 #### H2O function definitions 
+
+
 
 ```{r}
 # split into train and validation
