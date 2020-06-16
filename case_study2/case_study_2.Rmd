@@ -1,12 +1,23 @@
 ---
-title: "case study2"
-author: "Pankaj, Brady , Kay "
+title: "Case Study 2"
+author: "Pankaj Kumar, Brady Arendale, Kay Ayala"
 date: "5/28/2020"
 output: html_document
 ---
 
+# Introduction
 
-```{python}
+We were tasked with analyzing results from the women's portion of the annual Credit Union Cherry Blossom Ten Mile Run in Washington, D.C. We wanted to look at trends of things like age and completion times over the years.
+
+# Scraping the Data
+
+We used the Python package BeautifulSoup to scrape women's race results from 1999-2012. There were challenges with inconsistent formatting of the results from year to year, which we handled by using conditional statements and running different code based on the year. The following code downloads results for each year, scrapes them into a dataframe, and cleans it up for plotting. Then it saves the resulting data frame to `processed_women.csv`.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{python eval=FALSE}
 import re
 from io import StringIO
 import requests
@@ -78,7 +89,7 @@ ubase = "http://www.cherryblossom.org/"
 data_home = r'./race_data'
 ```
 
-```{python}
+```{python eval=FALSE}
 
 
 def scrap_runs(urls, gender):
@@ -108,7 +119,7 @@ def scrap_runs(urls, gender):
 ```
 
 
-```{python}
+```{python eval=FALSE}
 
 def create_df(gender):
     final_file_path = os.path.join(data_home,'final_{}.csv'.format(gender))
@@ -130,8 +141,8 @@ def create_df(gender):
                     all_columns.update(df.columns)
                     ## usually either net time ot time is present in data. for 2011 women both columns are 
                     #present with duplciate values. dropping one of them 
-                    if gender =='women' and year ==2011:
-                        df.drop('Time', axis=1, inplace=True)
+                    #if gender =='women' and year ==2011:
+                        #df.drop('Time', axis=1, inplace=True)
   
     cleaned_df = []
     for key in all_dfs.keys():
@@ -157,7 +168,7 @@ def convert_to_float (str):
 ```
 
 
-```{python}
+```{python eval=FALSE}
 
 gender = 'women'
 scrap_runs(womenURLs, gender)
@@ -169,44 +180,98 @@ df['AGE'].fillna(0, inplace=True)
 df['TOTAL_TIME'] =  df['TIME'].fillna(df['GUN_TIME'])
 df.to_csv(processed_file)
 
-print(processed_file)
-
 ```
 
+# Analysis
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
-library(tidyverse)
-library(ggplot2)
-
-female_table = read_csv('./race_data/processed_women.csv')
-
-```
-
+We will now load our created csv file into R for plotting and analysis. First we do some more cleanup, as shown in the code below.
 
 ```{r}
+library(ggplot2)
 
-female_table %>%   mutate (YEAR_R = as.factor(YEAR))   %>%
-ggplot(mapping = aes(x= YEAR_R, y= AGE))+
-  geom_boxplot()
+race <- read.csv("F:/SMU/Quantifying the World/qtw/case_study2/race_data/processed_women.csv", na.strings=c("","#"), stringsAsFactors = FALSE)
 
-
-female_table %>%   mutate (YEAR_R = as.factor(YEAR))   %>%
-ggplot(  mapping = aes(x= AGE , fill = YEAR_R))+
- geom_bar()
-
-
-female_table %>%   mutate (YEAR_R = as.factor(YEAR))   %>%
-  ggplot(  mapping = aes(x= AGE , color = YEAR_R ))+
-  geom_density()
-
-
-
-p <-  female_table %>%   mutate (YEAR_R = as.factor(YEAR)) %>%
-  filter(AGE>10 ) %>% 
-  ggplot(aes(sample = AGE, color = YEAR_R))
-p + stat_qq() + stat_qq_line()
+# Clean up TOTAL_TIME column
+# Remove *, #, and letters from times
+race$TOTAL_TIME <- gsub("[*#]", "", race$TOTAL_TIME)
+race$TOTAL_TIME <- gsub("[A-Za-z]", NA, race$TOTAL_TIME)
+# Get rows with only one colon in TOTAL_TIME (less than one hour)
+ind <- which(lengths(regmatches(race$TOTAL_TIME, gregexpr(":", race$TOTAL_TIME)))==1)
+# Add 0: to beginning of times
+race[ind,"TOTAL_TIME"] <- paste("0:", race[ind,"TOTAL_TIME"], sep="")
+# Add proper hour number to beginning of 2001 times
+race[(18+4523):(2768+4523),"TOTAL_TIME"] <- paste("1", race[(18+4523):(2768+4523),"TOTAL_TIME"], sep="")
+race[(2769+4523):(2972+4523),"TOTAL_TIME"] <- paste("2", race[(2769+4523):(2972+4523),"TOTAL_TIME"], sep="")
+# Remove rows that are not racers
+race <- race[!(race$AGE==0 & is.na(race$TOTAL_TIME)),]
+# Set age values of 0 to NA
+race[race$AGE==0,"AGE"] <- NA
+# Change year to a factor
+race$YEAR <- as.factor(race$YEAR)
+# Change TOTAL_TIME to difftime format
+race$TOTAL_TIME <- as.difftime(race$TOTAL_TIME)
 
 ```
 
+## Age distribution by year
+
+Let's examine the distribution of age by year:
+
+```{r}
+ggplot(race, aes(x= YEAR, y= AGE)) + geom_boxplot() + 
+  labs(x="Year", y="Age", title="Age distribution by year")
+```
+
+We see that age distribution is very similar from year to year. The median age was slightly higher in the earlier years. Now let's look at the density estimates for each year.
+
+```{r}
+plot_colors = c("#D8CAC3","#C5BCC2","#B2ADBF","#9F9FBB",
+                "#8D91B5","#7B84AE","#6A76A5","#58699B","#485D90",
+                "#385083","#294476","#1A3867","#0B2D58","#002248")
+ggplot(race, aes(x= AGE , color = YEAR)) + geom_density() + 
+  scale_color_manual(values = plot_colors) +
+  labs(x="Age", color="Year", title="Age density by year")
+
+```
+
+We can see that the age distributions for each year are skewed right. However, in more recent years the distribution has gradually become less skewed as more young people have entered the race.
+
+```{r}
+ggplot(race, aes(sample = AGE, color = YEAR)) + stat_qq() + stat_qq_line() +
+  scale_color_manual(values = plot_colors) +
+  labs(color="Year", title="Q-Q plot for distribution of age by year")
+```
+
+The Q-Q plot also shows the gradual change in skewness over the years. Let's break age into groups and see where the change is coming from.
+
+```{r}
+race$age_group <- cut(race$AGE, c(7,25,30,35,45,55,65,87), include.lowest = T)
+ggplot(race[!is.na(race$age_group),], aes(x=YEAR, fill=age_group)) + geom_bar(position = "fill") +
+  labs(x="Year", fill="Age group")
+```
+
+There is a large increase in the proportion of entrants 25 and under in recent years making up for part of the shift in the distributions over the years. There is also a notable increase in the 26-30 age group, and a decrease in the 35-45 age group.
+
+## Finish time by year
+
+Since we have race times for several years, we thought it would be interesting to see how finish times have changed over the years. Let's take a look:
+
+```{r}
+ggplot(race, aes(x=YEAR, y=TOTAL_TIME)) + geom_boxplot() + 
+  labs(x="Year", y="Time in minutes", title="Finish times by year")
+```
+
+Average finish times have trended a bit upwards from year to year. This could be due to differences in age distribution, or it could be from more casual runners entering. Let's look at the distribution of finish times by age group.
+
+## Finish time by age group
+
+```{r}
+ggplot(race[!is.na(race$age_group),], aes(x=age_group, y=TOTAL_TIME)) + geom_boxplot() +
+  labs(x="Age group", y="Time in minutes", title="Finish time by age group")
+```
+
+Unsurprisingly, finish times are higher on average for older age groups. This makes it more likely that the difference in finish times is caused by an increase in the number of people who only run or jog casually. We can see the increase in number of participants here:
+
+```{r}
+ggplot(race[!is.na(race$age_group),], aes(x=YEAR, fill=age_group)) + geom_bar() +
+  labs(x="Year", y="Number of participants", fill="Age group", title="Number of participants by year")
