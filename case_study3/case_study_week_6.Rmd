@@ -182,7 +182,15 @@ df1 %>%
 
 ```
 
+
+We cab see from above graphs there are some variables that dominate one type of messages more than others. For example variables isInReply to and  priority have just one value in Spam messages which means that they might be useful in splitting trees in tree based model.Other attributes like subPunk and multipartText are almost equally present in both types of messages. Similarly if 
+we see isPGsigned True then the message are almost always non spam.
+
+
 ## Tree Model 
+
+
+### Random Tree Model with 2 variables 
 
 
 ```{r pressure, echo=FALSE}
@@ -215,13 +223,6 @@ pred.rpint1 <- predict(emailDFrp.rp1,
                        type = "class")
 
 
-#
-#  Classification table on the test data
-#
-
-cm = table(emailDFrp$isSpam[-train], pred.rpint1)
-
-confusionMatrix(cm)
 
 
 #summary(emailDFrp.rp1)
@@ -236,12 +237,26 @@ text(emailDFrp.rp1,
      fancy = TRUE)
 
 fancyRpartPlot(emailDFrp.rp1, main="Decision Tree Graph With 2 variables ")
+
+
+#
+#  Classification table on the test data
+#
+
+cm = table(emailDFrp$isSpam[-train], pred.rpint1)
+
+confusionMatrix(cm)
+
+
 ```
 
 
 ### Grid search for tree model 
 
-```{r}
+We can see that accuracy of above random model is not very high so we do a grid search on all variables and different tree hights to figure out which tree will be the best suited and where we ll get optmimal results without overfitting the model.
+
+
+```{r }
 
 train.control <- trainControl(
   method = "repeatedcv",
@@ -275,11 +290,13 @@ plot(rpartFit2)
 ```
 
 
+
 From above grid search it looks like ROC curve area increases with number of depth but the increase is not much after max depth 6. so that one we ll choose for our final model 
 
 
 
-#### Tree Model with all variables 
+#### Tree Model with all variables and maxdepth determined by grid search.
+
 
 ``` {r}
 
@@ -315,9 +332,20 @@ fancyRpartPlot(emailDFrp.rp, main="Decision Tree Graph")
 
 ```
  
-#### Evaluation of Model :
 
-confusion matrix for model based on all vars 
+###  Plot and analysis of  the paths through  tree
+
+As per the above we plot we can see first split is on variable forward. if the value is more than 5.5 another split is done on variable perCaps. We can see that 53% of total mails are in node with forward >6 and perCaps less than 6. This contains 73% of non spams and 27 % of smaps. We split this node further based on subblanks less than 24. 
+Other nodes can be explained in same way and finally we reach leaf node.
+
+
+
+
+ 
+#### Evaluation of Model 
+
+confusion matrix for model based on all vars and max tree height 6.
+
 
 ```{r}
 
@@ -332,17 +360,28 @@ pred.rpint <- predict(emailDFrp.rp,
 
 cm = table(emailDFrp$isSpam[-train], pred.rpint)
 
-confusionMatrix(cm)
+print(confusionMatrix(cm))
 
 ```
 
+As we can see the accurace of this model is 87% on test data.
+
+
 ### Variables that are most important for the model we found with grid search 
+
+Most important variables determined by tree model are as per following attribute of model.
+
 
 ```{r}
 
 emailDFrp.rp$variable.importance
 
 ```
+
+
+We cab see the forwards , isInReplyTo and isRe etc. are among the most important variables. We found during our exploratory data analysis the similar conclusion. One type of emails were dominated by some specific variables more than other was. 
+
+
 
 
 #### H2O function definitions 
@@ -431,9 +470,11 @@ printValues <- function(values, is_na_direction, n=4) {
 
 ### H2O random forest model 
 
+We use random forest from h2o lib to generate other tree.
 
+```{r h2oplot , fig.height = 10, fig.width = 10, fig.align = "center"}
 
-```{r}
+#knitr::opts_chunk$set(fig.width=12, fig.height=8) 
 
 # Build and train the model:
 
@@ -478,9 +519,10 @@ SetEdgeStyle(emailDataTree, fontname = 'Palatino-italic',
              fontsize = "26", fontcolor='royalblue4')
 SetNodeStyle(emailDataTree, fontname = GetFontName, shape = GetNodeShape, 
              fontsize = "26", fontcolor='royalblue4',
-             height="0.75", width="1")
+             height="1.75", width="2")
 
 SetGraphStyle(emailDataTree, rankdir = "LR", dpi=70.)
+dev.new(width=10, height=10)
 
 plot(emailDataTree, output = "graph")
 
@@ -490,4 +532,9 @@ h2o.shutdown()
 
 
 ```
+
+
+
+We found almost similar variables in slightly different order as we found in our initial tree model.
+
 
