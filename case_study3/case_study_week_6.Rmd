@@ -16,14 +16,12 @@ library(RColorBrewer)
 library(data.tree)
 library(h2o)
 library(caret)
-
 library(DiagrammeR)
-
-
+library(tidyverse)
 
 ```
 
-## R Markdown Plot email variables 
+## R Markdown Plot email Exploring variables 
 
 
 
@@ -35,9 +33,9 @@ load("data.Rda")
 
 length(emailDFrp)
 
-library(tidyverse)
 
 plot(colSums(is.na(emailDFrp)))
+
 df1= emailDFrp
 
 df1$id = seq(1, length(emailDFrp$isRe))
@@ -48,11 +46,139 @@ df1 %>%
   geom_bar()
 
 df1 %>% 
-  ggplot(mapping = aes(x=id,  y = ..density.. , color = isSpam))+
-  geom_density( )
+  ggplot(mapping = aes(x= underscore, fill = isSpam))+
+  geom_bar()
+
+df1 %>% 
+  ggplot(mapping = aes(x= priority, fill = isSpam))+
+  geom_bar()
+
+
+df1 %>% 
+  ggplot(mapping = aes(x= isInReplyTo, fill = isSpam))+
+  geom_bar()
+
+df1 %>% 
+  ggplot(mapping = aes(x= sortedRec, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= subPunc, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= multipartText, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= hasImages, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= isPGPsigned, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= subSpamWords, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= noHost, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= numEnd, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= isYelling, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= isOrigMsg, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= isDear, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= isWrote, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= subExcCt, fill = isSpam))+
+  geom_bar()
+
+
+df1 %>% 
+  ggplot(mapping = aes(x= subQuesCt, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= numLines, fill = isSpam))+
+  geom_bar(binwidth = 100)
 
 
  
+df1 %>% 
+  ggplot(mapping = aes(x= numDlr, fill = isSpam))+
+  geom_bar(binwidth = 100)
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= numAtt, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= numRec, fill = isSpam))+
+  geom_bar(binwidth = 100)
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= hour, fill = isSpam))+
+  geom_bar()
+
+ 
+df1 %>% 
+  ggplot(mapping = aes(x= perHTML, fill = isSpam))+
+  geom_bar()
+
+
+
+df1 %>% 
+  ggplot(mapping = aes(x= forwards ,    color = isSpam))+
+  geom_freqpoly( binwidth= 1)
+
+
+df1 %>% 
+  ggplot(mapping = aes(x= perCaps ,    color = isSpam))+
+  geom_freqpoly(binwidth= 1 )
+
+df1 %>% 
+  ggplot(mapping = aes(x= bodyCharCt ,    color = isSpam))+
+  geom_freqpoly( binwidth= 100)
+
+df1 %>% 
+  ggplot(mapping = aes(x= avgWordLen ,    color = isSpam))+
+  geom_freqpoly(binwidth= 1 )
+
+df1 %>% 
+  ggplot(mapping = aes(x= subBlanks ,    color = isSpam))+
+  geom_freqpoly( binwidth= 1)
 
 ```
 
@@ -98,7 +224,7 @@ cm = table(emailDFrp$isSpam[-train], pred.rpint1)
 confusionMatrix(cm)
 
 
-summary(emailDFrp.rp1)
+#summary(emailDFrp.rp1)
 
 plot(emailDFrp.rp1, 
      uniform=TRUE,
@@ -354,7 +480,7 @@ SetNodeStyle(emailDataTree, fontname = GetFontName, shape = GetNodeShape,
              fontsize = "26", fontcolor='royalblue4',
              height="0.75", width="1")
 
-SetGraphStyle(emailDataTree, rankdir = "TD", dpi=70.)
+SetGraphStyle(emailDataTree, rankdir = "LR", dpi=70.)
 
 plot(emailDataTree, output = "graph")
 
