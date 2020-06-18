@@ -1,0 +1,180 @@
+---
+title: "Case Study 3"
+author: "Pankaj Kumar, Brady Arendale, Kay Ayala"
+date: "6/18/2020"
+output: html_document
+---
+
+# Introduction
+
+Our team was asked to build a spam classifier based on a given set of 9348 emails. For each email, we have a set of 29 engineered features and a label of spam or no spam. Features include things such as whether an email was a reply, whether it has images, whether it has certain "spam" words, and the average word length. Variable definitions were not provided, so we will not focus too much on why certain variables might affect the model, but more on which variables affect the model more.
+
+# Exploratory data analysis
+
+Our dataset has 2397 spam emails and 6951 non-spam emails:
+
+```{r}
+library(ggplot2)
+load("data.Rda")
+ggplot(emailDFrp, aes(x=isSpam)) + geom_bar() + ggtitle("Proportion of spam")
+```
+
+Let's look at the variables and see which ones seem to be more or less correlated with an email being spam.
+
+```{r}
+library(gridExtra)
+# Get factor columns
+factors = names(which(sapply(emailDFrp, is.factor)))
+plots = list()
+for (i in factors[-1]) {
+  plots[[i]] <- ggplot(emailDFrp, aes_string(x=i, fill="isSpam")) + geom_bar(position="fill")
+}
+do.call(grid.arrange, plots[1:4])
+```
+
+Both `isRe` and `isInReplyTo` are much more likely to be spam if they are false. Conversely, `priority` and `underscore` being true almost always signals that an email is spam.
+
+```{r}
+do.call(grid.arrange, plots[5:8])
+```
+
+`sortedRec` does not appear to give us very much information on whether an email is spam. `subPunc`, `multipartText`, and `hasImages` appear to be strong indicators of spam when true.
+
+```{r}
+do.call(grid.arrange, plots[9:12])
+```
+
+`isPGPsigned` has no occurrences of spam when true. `subSpamWords` and `numEnd` being true are good indicators of spam, while `noHost` was always spam when true. We have some missing values which we will address later.
+
+```{r}
+do.call(grid.arrange, plots[13:16])
+```
+
+`isYelling` and `isDear` are overwhelmingly spam when true. On the other hand, `isOrigMsg` and `isWrote` are almost never spam when true.
+
+```{r}
+ggplot(emailDFrp, aes(x=hour, fill=isSpam)) + geom_bar(position="fill")
+```
+
+It appears that emails in the wee hours of the morning may be slightly more likely to be spam.
+
+```{r}
+numerics <- names(which(!sapply(emailDFrp, is.factor)))
+numerics_sqrt <- c("numLines", "bodyCharCt")
+numerics <- numerics[!numerics %in% "hour"]
+plots_n <- list()
+for (i in numerics) {
+  plots_n[[i]] <- ggplot(emailDFrp, aes_string(x="isSpam", y=i)) + geom_boxplot()
+  if (i %in% numerics_sqrt) {
+    plots_n[[i]] <- plots_n[[i]] + scale_y_sqrt()
+  }
+}
+do.call(grid.arrange, plots_n[1:4])
+```
+
+Note that `numLines` and `bodyCharCt` are on the square root scale for clarity. Both these variables appear to have higher distributions for spam emails, indicating that they may be useful in our model. `subExcCt` also appears to have a higher distribution for spam. `subQuesCt` appears to be about the same for spam and non-spam.
+
+```{r}
+do.call(grid.arrange, plots_n[5:8])
+```
+
+We see higher distributions of `perCaps` and `perHTML` for spam emails. `numAtt` and `numRec` appear to show no difference.
+
+```{r}
+do.call(grid.arrange, plots_n[9:12])
+```
+
+`subBlanks` has a somewhat higher distribution for spam, while `forwards` has a higher distribution for non-spam. `avgWordLen` and `numDlr` do not show much difference.
+
+# Modeling
+
+We will split our data into an 80-20 train-test split to see how our model performs on data that it has not seen. We will fit a CART model to classify whether an email is spam or not. The one hyperparameter we can tune in a CART model is maximum tree depth. Deeper trees allow more comparisons, more variables to be compared, and more interactions, which can increase the performance of the classifier. However, deeper trees are more complex, making them less transparent and more prone to overfitting. We will test trees with max depths from 2 to 15. To find the optimal value for max depth, we will use repeated 10-fold cross-validation to find the best performing model. We will measure performance with area under the ROC curve (AUC). AUC can be thought of as the percent chance that a positive observation is ranked "higher" (more likely to be positive) than a negative observation. This metric was chosen due to its ability to measure how good a classifier is at classifying both positive and negative classes, and due to its native implementation in `caret`.
+
+CART has native handling of missing values. It does this by using surrogate variables when a value for the normal split rule is missing. Therefore, we do not need to impute missing values.
+
+```{r}
+library(caret)
+set.seed(2568)
+n <- nrow(emailDFrp)
+train_id <- sample(1:n, size = .8*n)
+email_train <- emailDFrp[train_id,]
+email_test <- emailDFrp[-train_id,]
+
+train.control <- trainControl(
+  method = "repeatedcv",
+  number = 10, ## 10-fold CV
+  repeats = 3,## repeated three times
+  # USE AUC
+  summaryFunction = twoClassSummary, 
+  classProbs = TRUE
+)
+
+tune.gridcart <- expand.grid(maxdepth = 2:15)
+
+model <- train(isSpam ~ . ,                         
+                                data = email_train,
+                                method = "rpart2", 
+                                tuneGrid = tune.gridcart,
+                                trControl = train.control,
+                                metric = "ROC", na.action = na.pass
+)
+
+plot(model)
+```
+
+Our highest value of AUC was at a max tree depth of 15. However, it does not have much of a performance increase over a max tree depth of 6, which is less prone to overfitting and easier to visualize. We will use a max tree depth of 6.
+
+```{r}
+library(rpart)
+library(rattle)
+emailDFrp.rp <- rpart(isSpam ~ . ,                         # formula
+                     data = emailDFrp,                       # data frame
+                     subset = train_id,                       # indices of training set
+                     method = "class",                     # classification tree
+                     parms = list(split = "information"),  # use entropy/deviance
+                     # provided each sub-node
+                     # contains at least 2 obs.
+                     control=rpart.control(maxdepth=6)
+)
+
+fancyRpartPlot(emailDFrp.rp, main="Decision Tree Graph", sub=NULL)
+```
+
+Our first split classifies all forwards >= 6.1 as non-spam. We saw earlier that forwards had a much higher distribution for non-spam, so this matches our intuition. For forwards < 6.1, the next split is on perCaps, which we showed to have a higher distribution for spam. Of the higher perCaps values, those with bodyCharCt > 278 are classified as spam, and otherwise not spam. For emails with lower perCaps values, the next split is on subBlanks, which we saw was somewhat higher for spam. Values of subBlanks 25 or higher are classified as spam, and the rest are passed onto the next split, which is bodyCharCt. bodyCharCt values less than 599 are classified as false. For those greater than 599, we look at isInReplyTo. We saw earlier that isInReplyTo values of true had no spam cases, and as expected we classify all those as non-spam. Those that are false are passed onto the last split, subExcCt. SubExcCt had lower values for non-spam as seen in our plot earlier, and our CART model classifies values less than 0.5 at this split as non-spam, and spam otherwise.
+
+Let's take a random email from our test data and see how it goes through the tree:
+
+```{r}
+set.seed(9001)
+sample_row <- sample(1:nrow(email_test), 1)
+email_test[sample_row,c("forwards","perCaps","subBlanks","bodyCharCt","isInReplyTo","subExcCt","isSpam")]
+```
+
+We have a forwards value < 6.1, which sends us to the right. We have a perCaps < 13, which sends us to the left. We have a subBlanks value < 25, which sends us to the left. We have a bodyCharCt value > 599, which sends us to the right. We have an isInReplyTo value of F, which sends us to the right. Lastly, we have a subExcCt value < 0.5, which sends us to the left. This gives us a prediction of F, with 67% F and 33% T. Let's verify:
+
+```{r}
+predict(emailDFrp.rp, newdata = email_test[sample_row,])
+```
+
+This matches up with what we got going through the tree manually. Let's make predictions on our test data and check our performance. We will evaluate our final model using precision, also known as positive predictive value. Precision is defined as the number of correctly predicted spam emails divided by the total number of predicted spam emails. This is important for spam classification because we do not want to send important emails to the spam folder where they may be missed.
+
+```{r}
+y_pred <- predict(emailDFrp.rp, newdata = email_test, type="class")
+y_true <- email_test$isSpam
+confusionMatrix(y_pred, y_true, positive = "T")
+```
+
+We obtained a precision of 0.88, meaning 88% of emails we classified as spam were actually spam. This is very good for a tree with a depth of 6. However, we did also miss a lot of spam emails.
+
+Lastly, let's look at what variables our CART model considered to be important. We use CART's feature importance score, which measures how each variable improves the model over all splits.
+
+```{r}
+var_importance <- emailDFrp.rp$variable.importance
+df_importance <- data.frame(variable=names(var_importance), importance=var_importance)
+ggplot(df_importance, aes(x=reorder(variable, -importance), y=importance)) + 
+  geom_col() + 
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) + 
+  labs(title="Variable importance for CART", x="variable")
+```
+
+This lines up both with what we saw in our plots earlier and what the splits in the tree were. `forwards` was the top split in the tree, and accordingly is the most important variable as determined by CART. One thing to note is that some variables such as `isRe` do not explicitly appear as splits in the tree even though they have high importance. These are variables that were used as surrogate variables to account for missing values as mentioned earlier. CART may have also determined that although some variables were important, they did not add any information after similar variables were already accounted for.
