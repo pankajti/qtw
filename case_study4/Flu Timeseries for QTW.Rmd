@@ -1,0 +1,118 @@
+---
+title: "Flu Timeseries Analysis for QTW"
+author: "Kay Ayala, Brady Arendale, Pankaj Kumar"
+date: "6/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Influenza Predictive Forcasting 
+
+In order to model predict the future number of patients expected to have flu symptoms in the United States, data was acquired from the US[Centers for Disease Control and Prevention (https://gis.cdc.gov/grasp/fluview/fluportaldashboard.html). The raw data was recorded from 1997 to 2020 on a weekly basis. All years up until 2002 had missing data and were excluded from the analysis. Below an excerpt from the raw data can be seen. This analysis uses only the column containing the total number of patients who show flu-like symptoms. This column is titled ILITOTAL. 
+
+```{r imports}
+library(tswge)
+```
+
+``` {r load data}
+# use ILINET
+
+ilinet = read.csv("/Users/kaileyayala/Desktop/QTW/FluViewPhase2Data/ILINet.csv")
+
+head(ilinet)
+
+total_ili = ilinet$ILITOTAL
+#total_ili
+
+```
+
+Below the plots of the total number of patients with flu symptoms from the full dataset and the dataset cropped to omit missing values.
+
+``` {r subset data }
+plotts.wge(total_ili)
+flu = total_ili[600:1200]
+flu = flu[1:586]
+plotts.wge(flu)
+
+```
+
+Below the yearly seasonality has been removed from the data. Initally the analysis removed seasonality for all of the following periods, however the predictive function only allowed for a single seasonality to be modeled: 104, 52, 22, 12, 5. Recall this data was recorded on a weekly basis so a period of 52 weeks is equivalent to a one year period. Future work may involve finding a function which allows for more kinds of seasonality to be captured. 
+
+``` {r remove seasonality}
+
+flu_dif_s = artrans.wge(flu, phi.tr = (c(rep(0,51), 1))) # takes out 51 week seasonality 
+
+sample_1 = plotts.sample.wge(flu_dif_s)
+```
+
+Above the first set of four graphs shows the realization and sample autocorrelations before and after the yearly lag has been subtracted out. The realization becomes roughly centered around the mean and the lag outcorrelations show less slow damping. Both of these indicate that yearly seasonality does appear to be present in the data and should be added to the final model. 
+
+In the second set of four graphs, the parzen window graph shows a peak around frequency 0. This means there is either still seasonality, wandering, some kind of non-stationary behavior, or a AR component still in the data. 
+
+Below, the first difference of the data is taken to see if that peak around frequency 0 can be accounted for with a non-stationary component. 
+
+``` {r remove first difference}
+flu_dif_d_s = artrans.wge(flu_dif_s, phi.tr = (1)) # takes first difference 
+sample_2 = plotts.sample.wge(flu_dif_d_s)# visual check of metrics 
+```
+
+The first set of four graphs show the realizations and autocorrelations before and after the first difference was taken. The realization after the fact looks much more like white noise though it still shows some periodicity. The autocorrelations after the fact show no longer show slow damping behavior. This shows the removal of the first difference did reduce the non-stationary behavior in the model. 
+
+The second set of four graphs contains the spectral density given by the Parzen Window function. This shows the dominant peak at frequency 0 has been removed. This also shows the removal of the first difference helped remove the non-stationary behavior of the model. 
+
+The above suggests the first difference should be included in the final model. 
+
+Even though there is still visiually apparent periodicity in the model due to the contraints of the forecasting function no more seasonality will be removed. Instead, ARMA components are considered. 
+
+Below, arma model order is estimated using AIC. The ARMA(4,2) model was chosen as it had the lowest AIC and throughout previous analyses it was commonly the top ARMA model for this data. The data was then modeled using an ARMA(4,2) in order to obtain the model parameters. 
+
+
+``` {r modeling arma components}
+# modeling arma components
+aic5.wge(flu_dif_d_s) 
+#chose to go with arma(4,2) because in all modeling steps that one came up the most
+
+est_arma = est.arma.wge(flu_dif_d_s, p=4, q=2, factor=T) # models with arma(4,2)
+```
+
+``` {r checking residuals, message=FALSE}
+parz2 = plotts.sample.wge(est_arma$res) # still shows minor periodicity to visual inspection. 
+
+ljung.wge(est_arma$res) #pval 0.1914016
+ljung.wge(est_arma$res, K=48)  #pval 0.5115472
+
+```
+
+The ljung-box test determines if there is evidence that the realization is white noise. In this case it shows that we can not reject the hypothesis that the realization is not white noise. In common terms this means the realization does not appear to be white noise. This means the visually apparent seasonality should be removed and considered in the model. However, the forecasting function only allows for one kind of periodicity to be captured. Using a function which allows for multiple kinds of periodicity is future work. 
+
+Below, the forecast for the last two years which accounts for 20% of the total data is shown along with it's ASE. 
+
+
+``` {r forecasting and finding ASE}
+#flu_train = flu[0:468]
+#flu_test = flu[468:586]
+
+fore_1 = fore.aruma.wge(flu, est_arma$phi, est_arma$theta, d=1, s=52, n.ahead=118, lastn=T, plot=T) 
+
+```
+
+
+```{r ASE}
+realization = flu[469:586]
+forecast = fore_1$f
+
+ASE = mean((realization - forecast)^2)
+ASE
+
+series_mean = mean(realization)
+naive_ASE = mean((series_mean - forecast)^2)
+naive_ASE
+
+#difference between forecast ASE and Naive ASE
+naive_ASE - ASE 
+```
+
+Above the ASE of the model is shown followed by the ASE of a naive model. These are followed by the difference between the two. 
