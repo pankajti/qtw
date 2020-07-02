@@ -1,0 +1,139 @@
+---
+title: "Flu Timeseries Analysis for QTW"
+author: "Kay Ayala, Brady Arendale, Pankaj Kumar"
+date: "6/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction and exploratory analysis
+
+In order to model predict the future number of patients expected to have flu symptoms in the United States, we acquired data from the US [Centers for Disease Control and Prevention](https://gis.cdc.gov/grasp/fluview/fluportaldashboard.html). The raw data was recorded from 1997 to 2020 on a weekly basis. All years up until 2002 had missing data from weeks 21-39. Since we require consecutive data for time series analysis, we excluded these years from our model. Below an excerpt from the raw data can be seen. This analysis uses only the column containing the total number of patients who show flu-like symptoms. This column is titled ILITOTAL. 
+
+```{r imports}
+library(tswge)
+```
+
+``` {r load data}
+# use ILINET
+ilinet = read.csv("ILINet.csv")
+
+head(ilinet)
+
+total_ili = ilinet$ILITOTAL
+
+```
+
+The plot below shows the number of flu patients over the full dataset:
+
+```{r plot data}
+ilinet$date <- strptime(paste(ilinet$YEAR, ilinet$WEEK, "1"), format = "%Y %U %u")
+plot(ilinet$date, ilinet$ILITOTAL, type="l", main="Weekly number of flu patients", 
+     xlab = "Date", ylab = "Number of patients")
+```
+
+We first subsetted the data starting at the 12th week of 2009 (the 600th observation) to get more recent, relevant data for our model. Then we took the first 80% of the data as our training set and the rest as our test set. The following plot shows the training set in red and the test set in green:
+
+``` {r subset data }
+flu = total_ili[600:1185]
+flu_all = flu
+flu_training = flu[1:468]
+plot(ilinet[600:1185, "date"], flu, type="l", main="Weekly number of flu patients (training data)", 
+     xlab = "Date", ylab = "Number of patients")
+lines(ilinet[600:1067, "date"], flu_training, type="l", col="red")
+lines(ilinet[1067:1185, "date"], ilinet[1067:1185, "ILITOTAL"], type="l", col="green")
+```
+
+We can clearly see that the data has periodic behavior, i.e. seasonality. This means that the data is non-stationary, that is, the mean, variance, or signal in the realization depend on time. Since this is very visually apparent, we will use a non-stationary model.
+
+# Modeling
+
+Below we remove the yearly seasonality from the data. We do this by differencing the data one year (52 weeks) apart. Initially our analysis removed seasonality for the periods 104, 52, 22, 12, and 5, however the predictive function only allowed for a single seasonality to be modeled.  Future work may involve finding a function which allows for more kinds of seasonality to be captured. 
+
+``` {r remove seasonality}
+
+flu_dif_s = artrans.wge(flu_training, phi.tr = (c(rep(0,51), 1))) # takes out 51 week seasonality 
+```
+
+This set of four graphs shows the realization and sample autocorrelations before and after the yearly lag has been subtracted out. The realization becomes roughly centered around the mean and the lag outcorrelations show less slow damping. Both of these indicate that yearly seasonality does appear to be present in the data and should be added to the final model. 
+
+```{r sample plots}
+sample_1 = plotts.sample.wge(flu_dif_s)
+```
+
+After accounting for yearly seasonality, the spectral density shows a peak around frequency 0. This means there is either still seasonality, wandering, some kind of non-stationary behavior, or an AR component still in the data. 
+
+Below, the first difference of the data is taken to see if that peak around frequency 0 can be accounted for with a non-stationary component. 
+
+``` {r remove first difference}
+flu_dif_d_s = artrans.wge(flu_dif_s, phi.tr = (1)) # takes first difference 
+```
+
+This set of four graphs shows the realizations and autocorrelations before and after the first difference was taken. The realization after differencing looks much more like white noise though it still shows some periodicity. The autocorrelations after the fact show no longer show slow damping behavior. This shows the removal of the first difference did reduce the non-stationary behavior in the model. 
+
+```{r sample plots 2}
+sample_2 = plotts.sample.wge(flu_dif_d_s)# visual check of metrics 
+```
+
+The second set of four graphs contains the spectral density given by the Parzen Window function. This shows the dominant peak at frequency 0 has been removed. This also shows the removal of the first difference helped remove the non-stationary behavior of the model. 
+
+The above suggests the first difference should be included in the final model. 
+
+Even though there is still visually apparent periodicity in the model, due to the constraints of the forecasting function no more seasonality will be removed. Instead, ARMA components are considered. 
+
+Below, ARMA model order is estimated using AIC. The ARMA(4,2) model was chosen as it had the lowest AIC, and throughout previous analyses it was commonly the top ARMA model for this data. The data was then modeled using an ARMA(4,2) in order to obtain the model parameters. 
+
+
+``` {r modeling arma components}
+# modeling arma components
+aic5.wge(flu_dif_d_s) 
+#chose to go with arma(4,2) because in all modeling steps that one came up the most
+
+est_arma = est.arma.wge(flu_dif_d_s, p=4, q=2, factor=T) # models with arma(4,2)
+```
+
+Our model parameters are shown above. We see that our AR components capture frequencies of 0.37 and 0.10. Now we will test our residuals to see if they are white noise or if there is still some autocorrelation present.
+
+``` {r checking residuals, message=FALSE}
+parz2 = plotts.sample.wge(est_arma$res, arlimits = TRUE) # still shows minor periodicity to visual inspection. 
+
+ljung.wge(est_arma$res) #pval 0.4671669
+ljung.wge(est_arma$res, K=48)  #pval 0.952915
+
+```
+
+Visually, there appear to be semi-regular periods where the time series has higher variance than others, but most autocorrelations appear to fall within the 95% confidence boundaries. The Ljung-Box test determines if there is evidence that the realization is white noise. In this case we fail to reject the hypothesis that the realization is white noise. This does not guarantee that the residuals are actually white noise, but there is not enough evidence to suggest that they are not. The remaining nonconstant variance is likely due to factors that cannot be explained by a univariate model, such as the flu season starting at a different time or the severity of a flu season being particularly high or low.
+
+# Forecasting
+
+We will now forecast the last 20% (118 weeks) of available data. We will measure our model's performance with average squared error (ASE). ASE is a standard metric for evaluating time series forecasts. It measures the squared difference between the actual and forecasted value and averages all the values together, and a lower ASE is better. ASE was chosen because it penalizes larger residuals more than smaller ones, and it is important to be as close as possible for efficient allocation of resources. Below, the forecast for the last 20% of the total data is shown along with its ASE.
+
+
+``` {r forecasting and finding ASE}
+fore_1 = fore.aruma.wge(flu, est_arma$phi, est_arma$theta, d=1, s=52, n.ahead=118, lastn=T, plot=T) 
+```
+
+
+```{r ASE}
+realization = flu[469:586]
+forecast = fore_1$f
+
+ASE = mean((realization - forecast)^2)
+ASE
+```
+
+The ASE for our forecast is 174364815. Our forecast appears to be very close to the actual time series. To test how effective our model is, we will compare it with a "naive" model that always predicts the mean of the training data.
+
+```{r ASE naive model}
+series_mean = mean(flu_training)
+naive_ASE = mean((series_mean - forecast)^2)
+naive_ASE
+
+#difference between forecast ASE and Naive ASE
+(naive_ASE - ASE)/naive_ASE
+```
+
+Our ARIMA model shows a 74.4% improvement in ASE over the naive model. We can conclude that this is a very effective and useful model, especially given its ability to closely forecast the number of flu patients a season or two in advance.
