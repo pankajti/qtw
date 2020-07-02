@@ -19,13 +19,11 @@ library(tswge)
 
 ``` {r load data}
 # use ILINET
-
 ilinet = read.csv("/Users/kaileyayala/Desktop/QTW/FluViewPhase2Data/ILINet.csv")
 
 head(ilinet)
 
 total_ili = ilinet$ILITOTAL
-#total_ili
 
 ```
 
@@ -35,15 +33,19 @@ Below the plots of the total number of patients with flu symptoms from the full 
 plotts.wge(total_ili)
 flu = total_ili[600:1200]
 flu = flu[1:586]
-plotts.wge(flu)
+flu_all = flu
+flu_training = flu[0:468]
+plotts.wge(flu_training)
 
 ```
+
+Above the data clearly has periodic behavior, ie. seasonality. This means that the data is non-stationary this means the mean, variance, or signal in the realization depend on time. Since this is very visually apparent, the final model needs to be a non-stationary model. 
 
 Below the yearly seasonality has been removed from the data. Initally the analysis removed seasonality for all of the following periods, however the predictive function only allowed for a single seasonality to be modeled: 104, 52, 22, 12, 5. Recall this data was recorded on a weekly basis so a period of 52 weeks is equivalent to a one year period. Future work may involve finding a function which allows for more kinds of seasonality to be captured. 
 
 ``` {r remove seasonality}
 
-flu_dif_s = artrans.wge(flu, phi.tr = (c(rep(0,51), 1))) # takes out 51 week seasonality 
+flu_dif_s = artrans.wge(flu_training, phi.tr = (c(rep(0,51), 1))) # takes out 51 week seasonality 
 
 sample_1 = plotts.sample.wge(flu_dif_s)
 ```
@@ -81,8 +83,8 @@ est_arma = est.arma.wge(flu_dif_d_s, p=4, q=2, factor=T) # models with arma(4,2)
 ``` {r checking residuals, message=FALSE}
 parz2 = plotts.sample.wge(est_arma$res) # still shows minor periodicity to visual inspection. 
 
-ljung.wge(est_arma$res) #pval 0.1914016
-ljung.wge(est_arma$res, K=48)  #pval 0.5115472
+ljung.wge(est_arma$res) #pval 0.0.4671669
+ljung.wge(est_arma$res, K=48)  #pval 0.952915
 
 ```
 
@@ -92,11 +94,7 @@ Below, the forecast for the last two years which accounts for 20% of the total d
 
 
 ``` {r forecasting and finding ASE}
-#flu_train = flu[0:468]
-#flu_test = flu[468:586]
-
 fore_1 = fore.aruma.wge(flu, est_arma$phi, est_arma$theta, d=1, s=52, n.ahead=118, lastn=T, plot=T) 
-
 ```
 
 
@@ -115,4 +113,4 @@ naive_ASE
 naive_ASE - ASE 
 ```
 
-Above the ASE of the model is shown followed by the ASE of a naive model. These are followed by the difference between the two. 
+Above the ASE of the model is shown followed by the ASE of a naive model. These are followed by the difference between the two. A lower ASE is preferred. Since the forecast looks to allign well with the validation set, this forecast visually appears to be reliable. Since the ASE for the model is lower than the naive model, this also shows the model is better than just guessing the mean which is exactly what would be expected.  
