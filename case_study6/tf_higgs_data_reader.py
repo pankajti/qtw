@@ -1,8 +1,11 @@
-from tensorflow_datasets.structured import higgs
+import tensorflow_datasets as tfds
+import pandas as pd
 
+higgs_data = tfds.load("higgs")
+higgs_train = higgs_data['train']
+h_ds = higgs_train.take(2)
 
-data = higgs.Higgs()
-
-
-for d in data:
-    print(d)
+for hd in h_ds :
+    print(hd['class_label'].numpy())
+    print(hd['jet_1_b-tag'].numpy())
+    pd.DataFrame()
